@@ -1,0 +1,109 @@
+# ESP-IDF project ignores
+# Date: 2026-11-14 · Build: 1
+
+# --- ESP-IDF build output ---
+build/
+cmake-build-*/
+.cmake/
+CMakeLists.txt.user*
+compile_commands.json
+.cache/
+
+# --- Generated SDK configuration (keep sdkconfig.defaults in git) ---
+sdkconfig
+sdkconfig.old
+sdkconfig.defaults.local
+
+# --- ESP-IDF component manager (keep dependencies.lock in git for reproducible builds) ---
+managed_components/
+# dependencies.lock
+
+# --- Compiler, linker and binary artifacts ---
+*.o
+*.obj
+*.a
+*.so
+*.elf
+*.bin
+*.map
+*.axf
+*.hex
+*.lst
+flash_args*
+*.nvs
+*.pac
+*.part
+
+# --- Host test binaries ---
+test/host/test_dsmr
+test/host/*.dSYM/
+
+# --- Coverage and profiling (host tests) ---
+*.gcda
+*.gcno
+*.gcov
+coverage/
+coverage.html
+lcov-report/
+
+# --- Python environments and caches (idf.py tooling) ---
+.env/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest_app/
+log/
+*.log
+
+# --- Debugging ---
+.gdbinit
+.gdbhistory
+core
+core.*
+*.core
+
+# --- Secret material: never commit keys or certificates ---
+*.pem
+*.key
+*.crt
+*.der
+secrets.h
+credentials.h
+*.env
+!.env.example
+
+# --- Editors and IDEs ---
+.claude/settings.local.json
+.vscode/
+# Uncomment to share VS Code settings (contains machine-specific ESP-IDF paths):
+# !.vscode/settings.json
+# !.vscode/tasks.json
+.idea/
+*.iml
+.vs/
+*.sublime-workspace
+*.swp
+*.swo
+*~
+tags
+.tags
+
+# --- Other
+.claude/
+
+# --- macOS ---
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Windows ---
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# --- Linux ---
+*~

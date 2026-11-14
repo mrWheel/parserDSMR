@@ -1,0 +1,41 @@
+//-- ==========================================================================
+//-- parserDSMR - DSMR/P1 telegram parser
+//-- File: src/dsmr_framing.h - ASCII framing state machine
+//-- Date: 2026-11-14 · Build: 1
+//--
+//-- The framer walks the explicit states of projectPrompt.md section 4:
+//-- seeking a header, receiving the body and validating the trailer. A
+//-- leading slash at a valid header position starts a candidate. The framer
+//-- stores the candidate and maintains the running CRC-16/ARC over the bytes
+//-- from '/' through '!' inclusive. Timeouts and telegram content validation
+//-- are the responsibility of the parser.
+//-- ==========================================================================
+
+#ifndef DSMR_FRAMING_H
+#define DSMR_FRAMING_H
+
+#include "dsmr_parser.h"
+
+typedef enum
+{
+  DSMR_FRAMING_NONE = 0,
+  DSMR_FRAMING_FRAME_COMPLETE,
+  DSMR_FRAMING_FRAME_TOO_LONG,
+  DSMR_FRAMING_TRAILER_MISSING_CRC,
+  DSMR_FRAMING_TRAILER_MALFORMED,
+} dsmrFramingOutcome;
+
+//-- Binds the framer to a caller-owned telegram buffer and starts seeking.
+void dsmrFramingInit(dsmrFraming *framing, uint8_t *buffer, size_t capacity);
+
+//-- Discards the current candidate and returns to seeking a header.
+void dsmrFramingRestart(dsmrFraming *framing);
+
+//-- Feeds one received byte. On DSMR_FRAMING_FRAME_COMPLETE the caller reads
+//-- the stored bytes from framing->buffer, the CRC-covered length from
+//-- framing->bodyLength, the CRC itself from framing->runningCrc and the
+//-- transmitted trailer digits from framing->trailerCrc and
+//-- framing->crcPresent. The caller must then call dsmrFramingRestart.
+dsmrFramingOutcome dsmrFramingByte(dsmrFraming *framing, dsmrCrcPolicy crcPolicy, bool acceptLfLineEndings, uint8_t byte);
+
+#endif //-- DSMR_FRAMING_H

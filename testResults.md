@@ -1,6 +1,6 @@
 # parserDSMR — test results
 
-**Date:** 2026-11-16 · **Build:** 6
+**Date:** 2026-11-16 · **Build:** 7
 
 This file records how parserDSMR is tested, which telegrams are used as
 test material, and the result of the most recent run. It covers every
@@ -33,7 +33,11 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror -g -fsanitize=address,undefined ...
 ```
 
 Result: **2154 checks, 0 failures** (2026-11-16). No `FAIL` lines were
-printed. In addition to the fixtures below, the run covers: the CRC
+printed. This run re-verified the library after `PROG_VERSION` in
+`src/dsmr_parser.c` was made `static` (internal linkage) to stop it
+colliding at link time with a `PROG_VERSION` of the calling application;
+`nm` confirms the symbol is now file-local and `dsmrParserVersion()`
+still returns the version string. In addition to the fixtures below, the run covers: the CRC
 check value `0xBB3D`, a sample telegram, init error cases, multiple
 frames per buffer, frame and inter-byte timeouts, oversize input, UART
 data loss, label tables and OBIS lookup, the built-in default field

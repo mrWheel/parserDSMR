@@ -1,6 +1,6 @@
 # parserDSMR — DSMR/P1 smart-meter telegram parser
 
-**Date:** 2026-11-16 · **Build:** 5
+**Date:** 2026-11-16 · **Build:** 8
 
 parserDSMR is a reusable C library that reads and parses P1 telegrams from
 European (Dutch, Belgian, Hungarian, Swedish, Finnish, Lithuanian, Irish,
@@ -72,9 +72,15 @@ same `src/` sources and expose the same C API.
 - **M-Bus aware.** Channels 1–4 are declared by the application; readings
   are attached to their channel and the published device type is checked
   against the declaration.
+- **Named out of the box.** Every built-in profile row carries a short
+  default display name (`enrgyDelvrdTar1`, `tarInd`, `mbusRdng`, …) from
+  the standard abbreviations; the application registers only the few
+  labels it wants to change.
 - **Runtime reconfigurable.** `dsmrParserApplyConfig` swaps profile, M-Bus
   device table and label table on a live instance without reallocation; a
   rejected configuration leaves the previous one fully active.
+  `dsmrParserSetFieldLabel` renames a single OBIS code without rebuilding
+  the table.
 
 ## Installing the component
 
@@ -289,7 +295,7 @@ dsmrParserFeed(bytes)
 │ dsmr_value  │   without locale dependence; timestamps are calendar-
 └─────┬───────┘   validated; M-Bus channels are checked against the
       │           declared device table; fields are named from the label
-      ▼           table.
+      ▼           table, else from the built-in defaults.
 ┌─────────────┐   one DSMR_EVENT_TELEGRAM with the ordered field array,
 │   events    │   or DSMR_EVENT_DIAGNOSTIC with reason + byte position.
 └─────────────┘
@@ -386,7 +392,7 @@ fall back to the defaults below.
 | `profileId` | `const char *` | Required unless `customProfile` is set. Must name a built-in profile, else `DSMR_ERR_UNKNOWN_PROFILE`. |
 | `customProfile` | `const dsmrProfile *` | `NULL` = use `profileId`. Otherwise a full profile description you own; its `profileId`, `countryCode`, `versionObis` and `acceptedVersions` must be non-NULL. |
 | `mbusDevices` / `mbusDeviceCount` | `const dsmrMbusDevice *` / `uint8_t` | Declared M-Bus channels 1–4, at most 4 entries, each channel at most once. `NULL`/0 = no M-Bus devices declared. |
-| `fieldLabels` / `fieldLabelCount` | `const dsmrFieldLabel *` / `uint16_t` | Application-determined names per OBIS code, at most 64 entries; OBIS ≤ 15 characters, name ≤ 31 characters. `NULL`/0 = no names. |
+| `fieldLabels` / `fieldLabelCount` | `const dsmrFieldLabel *` / `uint16_t` | Application override names per OBIS code, at most 64 entries; OBIS ≤ 15 characters, name ≤ 31 characters. They win over the built-in default display names; `NULL`/0 = defaults only. |
 | `maxTelegramBytes` | `uint16_t` | Telegram buffer limit; `0` → `DSMR_MAX_TELEGRAM_BYTES` (12288). May not exceed the hard maximum. |
 | `maxLineBytes` | `uint16_t` | Longest single data line; `0` → `DSMR_MAX_LINE_BYTES` (2200). |
 | `maxFields` | `uint16_t` | Upper bound of the received-field array; `0` → `DSMR_DEFAULT_MAX_FIELDS` (128); hard maximum 256. |
@@ -514,7 +520,15 @@ config.mbusDeviceCount = sizeof mbusDevices / sizeof mbusDevices[0];
 
 ### Naming fields for your application
 
-Labels are yours to choose; the parser copies them and attaches them to
+Every built-in field-table row carries a default display name, so known
+fields arrive with a short name even when you register nothing. The names
+follow the standard abbreviations (`delvrd`, `recvd`, `enrgy`, `pwr`,
+`curr`, `volt`, `tar`, `timestmp`, `equipm`, `mbus`, …): `1-0:1.8.1`
+arrives as `enrgyDelvrdTar1`, `0-0:96.14.0` as `tarInd`, `0-1:24.2.1` as
+`mbusRdng`.
+
+Your own labels always win over the defaults, so you only register the few
+codes you want to rename; the parser copies them and attaches them to
 matching fields:
 
 ```c
@@ -529,8 +543,27 @@ config.fieldLabels = fieldLabels;
 config.fieldLabelCount = sizeof fieldLabels / sizeof fieldLabels[0];
 ```
 
-Fields without a label keep `name == NULL` and remain reachable through
-`dsmrResultFindFieldByObis`.
+To rename one specific field on a running parser without rebuilding the
+table, use `dsmrParserSetFieldLabel`:
+
+```c
+//-- One field, one call; every other field keeps its label or default.
+dsmrParserSetFieldLabel(&parser, "1-0:1.8.1", "gridImportTar1");
+
+//-- A NULL name drops the override: the field falls back to its
+//-- built-in default.
+dsmrParserSetFieldLabel(&parser, "1-0:1.8.1", NULL);
+```
+
+Overrides match the exact OBIS code as received (M-Bus codes carry the
+concrete channel digit) and share the 64-entry storage with the
+configuration table: a full table yields
+`DSMR_ERR_INSUFFICIENT_WORKSPACE`, and the next `dsmrParserApplyConfig`
+restores the table from the configuration.
+
+Fields with neither an application label nor a built-in default — the
+unknown fields kept by the raw policy — keep `name == NULL` and remain
+reachable through `dsmrResultFindFieldByObis`.
 
 ### Reconfiguring a running parser
 
@@ -607,7 +640,9 @@ static const dsmrProfile myProfile =
 };
 ```
 
-Notes: `groupCount` `0` accepts any number of groups; DECIMAL fields with
+Notes: a row may end with a designated `.name = "..."` entry giving it a
+built-in default display name (application labels still win); positional
+rows leave it `NULL`. `groupCount` `0` accepts any number of groups; DECIMAL fields with
 two groups carry a value and a timestamp (the Belgian maximum-demand field;
 the M-Bus `0-n:24.2.1` layout with the timestamp *before* the value is
 handled automatically); LOG fields add `logPrefixGroups` and
@@ -673,6 +708,19 @@ reallocating the workspace. A partial telegram is discarded and framing
 restarts. A rejected configuration yields a distinct error and leaves the
 previous configuration fully active. Must not be called from the event
 callback on the same instance.
+
+```c
+dsmrParserStatus dsmrParserSetFieldLabel(dsmrParser *parser, const char *obis, const char *name);
+```
+Sets, replaces or — with a `NULL` name — removes a single application
+label override on a live instance, without rebuilding the table. The
+override matches the exact OBIS code as received and wins over the
+built-in default display name for that code; removing an absent override
+succeeds. The parser copies both strings. Adding beyond
+`DSMR_MAX_FIELD_LABELS` entries yields `DSMR_ERR_INSUFFICIENT_WORKSPACE`.
+The next `dsmrParserApplyConfig` restores the table from the
+configuration. Must not be called from the event callback on the same
+instance.
 
 ```c
 dsmrParserStatus dsmrParserNotifyDataLoss(dsmrParser *parser, dsmrEventCallback callback, void *userData);
@@ -778,7 +826,7 @@ typedef struct
 {
   const char *obis;        //-- as published (M-Bus codes carry the concrete channel)
   uint8_t mbusChannel;     //-- 0 = direct/electricity, 1..4 = M-Bus channel
-  const char *name;        //-- from your label table, or NULL
+  const char *name;        //-- your label, else the built-in default name, else NULL
   dsmrValue value;
   const char *unit;        //-- from the profile table, or NULL (text/unknown fields)
   dsmrTimestamp timestamp; //-- valid when hasTimestamp
@@ -900,9 +948,14 @@ The repository root is a no-hardware test project. It replays the sample
 telegram in `test/fixtures/dsmr_sample_telegram.h` and prints the decoded
 fields in the monitor. It adds the component from `components/parserDSMR`,
 which points to the shared source, adapter, and include directories. The
-application labels in `test/fixtures/dsmr_sample_labels.h` are based on the
-DSMR 5.0.2 P1 object table. Each line shows the OBIS code, label and value;
-an unknown label is shown as `-`.
+This project runs on the **built-in default field names** and renames
+only `1-0:1.8.2` and `1-0:2.8.2` through `dsmrParserSetFieldLabel`, so the
+monitor shows the defaults next to two `-changed` overrides. Each line
+shows the OBIS code, name and value — your label when registered, the
+library default otherwise; a field with neither is shown as `-`. The full
+`dsmrSampleLabels` table in `test/fixtures/dsmr_sample_labels.h` (based on
+the DSMR 5.0.2 P1 object table) still serves the host tests and the
+dedicated examples.
 
 With the VS Code ESP-IDF extension, open the repository root as a project,
 or on the command line:

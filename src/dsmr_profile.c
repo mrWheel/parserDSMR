@@ -1,7 +1,14 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_profile.c - built-in profile definitions and registry
-//-- Date: 2026-11-16 · Build: 5
+//-- Date: 2026-11-16 · Build: 8
+//--
+//-- Every field row carries a built-in default display name in .name. The
+//-- names use the standard abbreviations (delvrd, recvd, enrgy, pwr, curr,
+//-- volt, tar, timestmp, equipm, mbus, ...) and apply whenever the
+//-- application registers no label for the code; the application label
+//-- table always wins. The same OBIS code carries the same default in every
+//-- block, verified by the host tests.
 //--
 //-- Profile identifiers: nl.dsmr.4.0, nl.dsmr.4.2, nl.dsmr.5.0, nl.dsmr.4
 //-- (automatic 4.0/4.2 selection from the reported version), be.emucs.1.x
@@ -29,30 +36,30 @@
 //-- Identity, version and timestamps.
 static const dsmrFieldDefinition nlIdentityFields[] =
 {
-  { .obis = "1-3:0.2.8", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.1.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:1.0.0", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.13.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.13.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-3:0.2.8", .name = "tlgrmVers", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.1.1", .name = "equipmId", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:1.0.0", .name = "meterTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.13.0", .name = "usrTxtMess", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.13.1", .name = "txtMessCharCod", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Energy readings, tariff indicator and instantaneous totals.
 static const dsmrFieldDefinition nlEnergyFields[] =
 {
-  { .obis = "1-0:1.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-0:96.14.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:1.8.1", .name = "enrgyDelvrdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.2", .name = "enrgyDelvrdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.1", .name = "enrgyRecvdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.2", .name = "enrgyRecvdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.7.0", .name = "pwrDelvrd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.7.0", .name = "pwrRecvd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-0:96.14.0", .name = "tarInd", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Aggregate counters, published by DSMR 5.0.
 static const dsmrFieldDefinition nlAggregateFields[] =
 {
-  { .obis = "1-0:1.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.0", .name = "enrgyDelvrdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.0", .name = "enrgyRecvdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Phase measurements for three-phase meters. The codes follow the P1
@@ -64,26 +71,26 @@ static const dsmrFieldDefinition nlAggregateFields[] =
 //-- 22/42/62.7.0, current on 31/51/71.7.0 and voltage on 32/52/72.7.0.
 static const dsmrFieldDefinition nlPhaseFields[] =
 {
-  { .obis = "1-0:21.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:41.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:61.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:22.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:42.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:62.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:31.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:51.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:71.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:32.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
-  { .obis = "1-0:52.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
-  { .obis = "1-0:72.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:21.7.0", .name = "pwrDelvrdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:41.7.0", .name = "pwrDelvrdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:61.7.0", .name = "pwrDelvrdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:22.7.0", .name = "pwrRecvdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:42.7.0", .name = "pwrRecvdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:62.7.0", .name = "pwrRecvdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:31.7.0", .name = "currL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:51.7.0", .name = "currL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:71.7.0", .name = "currL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:32.7.0", .name = "voltL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:52.7.0", .name = "voltL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:72.7.0", .name = "voltL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
 };
 
 //-- Power quality counters and the structured failure log.
 static const dsmrFieldDefinition nlPowerQualityFields[] =
 {
-  { .obis = "0-0:96.7.21", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.7.9", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:99.97.0", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 1, .logEntryGroups = 3 },
+  { .obis = "0-0:96.7.21", .name = "pwrFailrsCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.7.9", .name = "pwrFailrsLngCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:99.97.0", .name = "pwrFailrsLog", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 1, .logEntryGroups = 3 },
 };
 
 //-- M-Bus submeter objects. The channel digit is a wildcard so the entries
@@ -91,9 +98,9 @@ static const dsmrFieldDefinition nlPowerQualityFields[] =
 //-- decode time; m3 is the default for gas and water readings.
 static const dsmrFieldDefinition nlMbusFields[] =
 {
-  { .obis = "0-?:24.1.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-?:24.2.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-?:24.3.1", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.1.0", .name = "mbusDevTyp", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.2.1", .name = "mbusRdng", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-?:24.3.1", .name = "mbusRdngTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- --------------------------------------------------------------------------
@@ -103,23 +110,23 @@ static const dsmrFieldDefinition nlMbusFields[] =
 //-- Identity, version and timestamps. The version object is 0-0:96.1.4.
 static const dsmrFieldDefinition beIdentityFields[] =
 {
-  { .obis = "0-0:96.1.4", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.1.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:1.0.0", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.13.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.13.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.1.4", .name = "tlgrmVers", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.1.1", .name = "equipmId", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:1.0.0", .name = "meterTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.13.0", .name = "usrTxtMess", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.13.1", .name = "txtMessCharCod", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Energy readings, tariff indicator and instantaneous totals.
 static const dsmrFieldDefinition beEnergyFields[] =
 {
-  { .obis = "1-0:1.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-0:96.14.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:1.8.1", .name = "enrgyDelvrdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.2", .name = "enrgyDelvrdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.1", .name = "enrgyRecvdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.2", .name = "enrgyRecvdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.7.0", .name = "pwrDelvrd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.7.0", .name = "pwrRecvd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-0:96.14.0", .name = "tarInd", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Phase measurements. Same objects as the Dutch phase group (cross-checked
@@ -127,44 +134,44 @@ static const dsmrFieldDefinition beEnergyFields[] =
 //-- up to two fractional digits, power up to three.
 static const dsmrFieldDefinition bePhaseFields[] =
 {
-  { .obis = "1-0:21.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:41.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:61.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:22.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:42.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:62.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:31.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:51.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:71.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:32.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
-  { .obis = "1-0:52.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
-  { .obis = "1-0:72.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:21.7.0", .name = "pwrDelvrdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:41.7.0", .name = "pwrDelvrdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:61.7.0", .name = "pwrDelvrdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:22.7.0", .name = "pwrRecvdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:42.7.0", .name = "pwrRecvdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:62.7.0", .name = "pwrRecvdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:31.7.0", .name = "currL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:51.7.0", .name = "currL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:71.7.0", .name = "currL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:32.7.0", .name = "voltL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:52.7.0", .name = "voltL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:72.7.0", .name = "voltL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
 };
 
 //-- Power quality counters and the structured failure log.
 static const dsmrFieldDefinition bePowerQualityFields[] =
 {
-  { .obis = "0-0:96.7.21", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.7.9", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:99.97.0", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 2, .logEntryGroups = 4 },
+  { .obis = "0-0:96.7.21", .name = "pwrFailrsCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.7.9", .name = "pwrFailrsLngCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:99.97.0", .name = "pwrFailrsLog", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 2, .logEntryGroups = 4 },
 };
 
 //-- M-Bus submeter objects. Belgian gas readings use 0-n:24.2.3 and eMUCs
 //-- 1.7.1 water readings use 0-n:24.2.1.
 static const dsmrFieldDefinition beMbusFields[] =
 {
-  { .obis = "0-?:24.1.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-?:24.2.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-?:24.2.3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-?:24.3.1", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.1.0", .name = "mbusDevTyp", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.2.1", .name = "mbusRdng", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-?:24.2.3", .name = "mbusGasRdng", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-?:24.3.1", .name = "mbusRdngTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Belgian demand objects, defined for eMUCs 2.1.
 static const dsmrFieldDefinition beDemandFields[] =
 {
-  { .obis = "1-0:1.4.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.6.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 2 },
-  { .obis = "0-0:98.1.0", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 1, .logEntryGroups = 2 },
+  { .obis = "1-0:1.4.0", .name = "demandAvg", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.6.0", .name = "monthDemandMax", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 2 },
+  { .obis = "0-0:98.1.0", .name = "demandHist", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 1, .logEntryGroups = 2 },
 };
 
 //-- --------------------------------------------------------------------------
@@ -184,64 +191,64 @@ static const dsmrFieldDefinition beDemandFields[] =
 //-- the DSMR-style version object.
 static const dsmrFieldDefinition euIdentityFields[] =
 {
-  { .obis = "1-3:0.2.8", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.1.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:1.0.0", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.14.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-3:0.2.8", .name = "tlgrmVers", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.1.1", .name = "equipmId", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:1.0.0", .name = "meterTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.14.0", .name = "tarInd", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- User text message, published by NL, BE, HU, SE and FI.
 static const dsmrFieldDefinition euTextMessageFields[] =
 {
-  { .obis = "0-0:96.13.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.13.0", .name = "usrTxtMess", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Energy readings and instantaneous totals, published by all countries.
 static const dsmrFieldDefinition euEnergyFields[] =
 {
-  { .obis = "1-0:1.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.1", .name = "enrgyDelvrdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.2", .name = "enrgyDelvrdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.1", .name = "enrgyRecvdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.2", .name = "enrgyRecvdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.7.0", .name = "pwrDelvrd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.7.0", .name = "pwrRecvd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Aggregate counters over all tariffs: SE, FI, HU and LT. NL and BE
 //-- publish only the per-tariff readings.
 static const dsmrFieldDefinition euAggregateFields[] =
 {
-  { .obis = "1-0:1.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.0", .name = "enrgyDelvrdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.0", .name = "enrgyRecvdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Aggregate reactive energy counters: SE, FI, HU and LT.
 static const dsmrFieldDefinition euReactiveAggregateFields[] =
 {
-  { .obis = "1-0:3.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:4.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:3.8.0", .name = "reacEnrgyDelvrdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:4.8.0", .name = "reacEnrgyRecvdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Per-tariff reactive energy readings: HU and LT.
 static const dsmrFieldDefinition euReactiveTariffFields[] =
 {
-  { .obis = "1-0:3.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:3.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:4.8.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:4.8.2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:3.8.1", .name = "reacEnrgyDelvrdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:3.8.2", .name = "reacEnrgyDelvrdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:4.8.1", .name = "reacEnrgyRecvdTar1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:4.8.2", .name = "reacEnrgyRecvdTar2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Instantaneous reactive power totals: SE, FI and HU.
 static const dsmrFieldDefinition euReactivePowerFields[] =
 {
-  { .obis = "1-0:3.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:4.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:23.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:43.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:63.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:24.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:44.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:64.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:3.7.0", .name = "reacPwrDelvrd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:4.7.0", .name = "reacPwrRecvd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:23.7.0", .name = "reacPwrDelvrdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:43.7.0", .name = "reacPwrDelvrdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:63.7.0", .name = "reacPwrDelvrdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:24.7.0", .name = "reacPwrRecvdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:44.7.0", .name = "reacPwrRecvdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:64.7.0", .name = "reacPwrRecvdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Active power, current and voltage per phase. The active power objects
@@ -249,43 +256,43 @@ static const dsmrFieldDefinition euReactivePowerFields[] =
 //-- appear on three-phase meters only.
 static const dsmrFieldDefinition euPhaseFields[] =
 {
-  { .obis = "1-0:21.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:41.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:61.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:22.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:42.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:62.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:31.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:51.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:71.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:32.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
-  { .obis = "1-0:52.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
-  { .obis = "1-0:72.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:21.7.0", .name = "pwrDelvrdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:41.7.0", .name = "pwrDelvrdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:61.7.0", .name = "pwrDelvrdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:22.7.0", .name = "pwrRecvdL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:42.7.0", .name = "pwrRecvdL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:62.7.0", .name = "pwrRecvdL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:31.7.0", .name = "currL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:51.7.0", .name = "currL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:71.7.0", .name = "currL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:32.7.0", .name = "voltL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:52.7.0", .name = "voltL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
+  { .obis = "1-0:72.7.0", .name = "voltL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "V", .maxScale = 2, .groupCount = 1 },
 };
 
 //-- Voltage sag and swell counters per phase: NL, BE, HU, SE and FI.
 static const dsmrFieldDefinition euSagSwellFields[] =
 {
-  { .obis = "1-0:32.32.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:52.32.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:72.32.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:32.36.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:52.36.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:72.36.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:32.32.0", .name = "voltSagCntL1", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:52.32.0", .name = "voltSagCntL2", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:72.32.0", .name = "voltSagCntL3", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:32.36.0", .name = "voltSwellCntL1", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:52.36.0", .name = "voltSwellCntL2", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:72.36.0", .name = "voltSwellCntL3", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Structured power failure log, same DSMR record layout: NL, BE, HU, SE
 //-- and FI.
 static const dsmrFieldDefinition euFailureLogField[] =
 {
-  { .obis = "1-0:99.97.0", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 1, .logEntryGroups = 3 },
+  { .obis = "1-0:99.97.0", .name = "pwrFailrsLog", .type = DSMR_FIELD_TYPE_LOG, .unit = NULL, .maxScale = 0, .groupCount = 0, .logPrefixGroups = 1, .logEntryGroups = 3 },
 };
 
 //-- Power failure counters used with the log.
 static const dsmrFieldDefinition euPowerQualityFields[] =
 {
-  { .obis = "0-0:96.7.21", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.7.9", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.7.21", .name = "pwrFailrsCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.7.9", .name = "pwrFailrsLngCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- M-Bus submeter objects used by the 1-3:0.2.8 family countries that
@@ -294,29 +301,30 @@ static const dsmrFieldDefinition euPowerQualityFields[] =
 //-- handling of the decoder accepts both layouts.
 static const dsmrFieldDefinition euMbusFields[] =
 {
-  { .obis = "0-?:24.1.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-?:96.1.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-?:24.2.1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-?:24.3.1", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.1.0", .name = "mbusDevTyp", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:96.1.1", .name = "mbusEquipmId", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.2.1", .name = "mbusRdng", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "m3", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-?:24.3.1", .name = "mbusRdngTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
-//-- Legacy M-Bus equipment identifier, published alongside 0-n:96.1.1 by
-//-- DSMR 4 style meters and by Hungarian meters.
+//-- M-Bus equipment identifier of the DSMR wire format: the P1 Companion
+//-- Standards list 0-n:96.1.0 as "Equipment identifier" for every published
+//-- channel; Hungarian meters also publish 0-n:96.1.1 alongside it.
 static const dsmrFieldDefinition euMbusLegacyIdField[] =
 {
-  { .obis = "0-?:96.1.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:96.1.0", .name = "mbusId", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Valve position of a coupled M-Bus gas or water meter: BE and HU.
 static const dsmrFieldDefinition euMbusValveField[] =
 {
-  { .obis = "0-?:24.4.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.4.0", .name = "mbusValvePos", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Circuit breaker state (0=off, 1=on, 2=ready to switch on): BE, HU and LT.
 static const dsmrFieldDefinition euBreakerField[] =
 {
-  { .obis = "0-0:96.3.10", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.3.10", .name = "breakerStat", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Actual power limit / limiter value: BE and HU. The Dutch style publishes
@@ -325,93 +333,93 @@ static const dsmrFieldDefinition euBreakerField[] =
 //-- 0-0:17.0.0 in kVA instead (luExtraFields).
 static const dsmrFieldDefinition euLimiterFields[] =
 {
-  { .obis = "1-0:17.0.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-0:17.0.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:17.0.0", .name = "pwrLimit", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-0:17.0.0", .name = "pwrLimit", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Fuse / current limit value per phase: BE and HU.
 static const dsmrFieldDefinition euCurrentLimitFields[] =
 {
-  { .obis = "1-0:31.4.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:31.4.0", .name = "currLimitL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Meter internal status / fault flags as a hexadecimal bit mask: HU, LT
 //-- and SE.
 static const dsmrFieldDefinition euStatusField[] =
 {
-  { .obis = "0-0:96.5.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.5.0", .name = "statFlags", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Error code register, filled only on internal meter errors: HU, SE and FI.
 static const dsmrFieldDefinition euErrorRegisterField[] =
 {
-  { .obis = "0-0:97.97.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:97.97.0", .name = "errCodeReg", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Internal status / factory flags (Sagemcom and Landis+Gyr style meters):
 //-- BE, LT and IE.
 static const dsmrFieldDefinition euStatusFlagsField[] =
 {
-  { .obis = "0-0:96.10.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.10.1", .name = "factStatFlags", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Event code / last event in the log book: HU and LT.
 static const dsmrFieldDefinition euEventCodeField[] =
 {
-  { .obis = "0-0:96.11.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.11.0", .name = "eventCode", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Hungarian (MVM/E.ON) tariff 3 and 4 counters, published only on meters
 //-- with more than two tariffs.
 static const dsmrFieldDefinition huTariff34Fields[] =
 {
-  { .obis = "1-0:1.8.3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.8.4", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.4", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.3", .name = "enrgyDelvrdTar3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.4", .name = "enrgyDelvrdTar4", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.3", .name = "enrgyRecvdTar3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.4", .name = "enrgyRecvdTar4", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Hungarian (ELMŰ/ÉMÁSZ) combined total active energy |(+A)| + |(-A)|.
 static const dsmrFieldDefinition huTotalActiveField[] =
 {
-  { .obis = "1-0:15.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:15.8.0", .name = "enrgyActTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Hungarian reactive energy quadrant measurements on specific meters.
 static const dsmrFieldDefinition huQuadrantFields[] =
 {
-  { .obis = "1-0:5.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:6.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:7.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:8.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:5.8.0", .name = "reacEnrgyQ1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:6.8.0", .name = "reacEnrgyQ2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:7.8.0", .name = "reacEnrgyQ3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:8.8.0", .name = "reacEnrgyQ4", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Hungarian meter specifics: neutral current, frequency, power factors,
 //-- numeric text message and the legacy split local date and time.
 static const dsmrFieldDefinition huExtraFields[] =
 {
-  { .obis = "1-0:91.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:14.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "Hz", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:13.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:33.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:53.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:73.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-0:96.13.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:91.7.0", .name = "currNeut", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:14.7.0", .name = "freq", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "Hz", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:13.7.0", .name = "pwrFactTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:33.7.0", .name = "pwrFactL1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:53.7.0", .name = "pwrFactL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:73.7.0", .name = "pwrFactL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = NULL, .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-0:96.13.1", .name = "txtMessCharCod", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
   //-- Legacy split local clock of older Hungarian meters: local time hhmmss
   //-- and local date YYMMDD, published apart from 0-0:1.0.0.
-  { .obis = "1-0:0.9.1", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:0.9.2", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "1-0:5.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:6.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:7.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:8.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:51.4.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:71.4.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-0:96.50.68", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:42.0.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:0.9.1", .name = "localTime", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:0.9.2", .name = "localDate", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:5.7.0", .name = "reacPwrQ1", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:6.7.0", .name = "reacPwrQ2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:7.7.0", .name = "reacPwrQ3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:8.7.0", .name = "reacPwrQ4", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVAr", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:51.4.0", .name = "currLimitL2", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:71.4.0", .name = "currLimitL3", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "A", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-0:96.50.68", .name = "breakerStat", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:42.0.0", .name = "devName", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
   //-- E.ON Hungária reports the meter serial on 0-0:96.1.0. The exact code
   //-- precedes the "0-?:96.1.0" M-Bus wildcard so both resolve correctly.
-  { .obis = "0-0:96.1.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.1.0", .name = "equipmSerial", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Luxembourg (Luxmetering E-Meter P1 Specification 1.1.3): DSMR 5.0.2
@@ -420,44 +428,44 @@ static const dsmrFieldDefinition huExtraFields[] =
 //-- device name and the equipment identifier; no tariff indicator.
 static const dsmrFieldDefinition luIdentityFields[] =
 {
-  { .obis = "1-3:0.2.8", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:1.0.0", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:42.0.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
-  { .obis = "0-0:96.1.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-3:0.2.8", .name = "tlgrmVers", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:1.0.0", .name = "meterTimestmp", .type = DSMR_FIELD_TYPE_TIMESTAMP, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:42.0.0", .name = "devName", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:96.1.0", .name = "equipmSerial", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- Luxembourg energy objects: totals only, no per-tariff readings.
 static const dsmrFieldDefinition luEnergyFields[] =
 {
-  { .obis = "1-0:1.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:3.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:4.8.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:1.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:2.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.8.0", .name = "enrgyDelvrdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.8.0", .name = "enrgyRecvdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kWh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:3.8.0", .name = "reacEnrgyDelvrdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:4.8.0", .name = "reacEnrgyRecvdTtl", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVArh", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:1.7.0", .name = "pwrDelvrd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:2.7.0", .name = "pwrRecvd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kW", .maxScale = 3, .groupCount = 1 },
 };
 
 //-- Luxembourg apparent power, the active threshold (SMAX) in kVA at
 //-- 0-0:17.0.0 and the power failure counter of the readout list.
 static const dsmrFieldDefinition luExtraFields[] =
 {
-  { .obis = "1-0:9.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVA", .maxScale = 3, .groupCount = 1 },
-  { .obis = "1-0:10.7.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVA", .maxScale = 3, .groupCount = 1 },
-  { .obis = "0-0:17.0.0", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVA", .maxScale = 1, .groupCount = 1 },
-  { .obis = "0-0:96.7.21", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "1-0:9.7.0", .name = "appPwrDelvrd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVA", .maxScale = 3, .groupCount = 1 },
+  { .obis = "1-0:10.7.0", .name = "appPwrRecvd", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVA", .maxScale = 3, .groupCount = 1 },
+  { .obis = "0-0:17.0.0", .name = "pwrLimit", .type = DSMR_FIELD_TYPE_DECIMAL, .unit = "kVA", .maxScale = 1, .groupCount = 1 },
+  { .obis = "0-0:96.7.21", .name = "pwrFailrsCnt", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- M-Bus device type only; Finnish and Irish meters publish the type
 //-- object without submeter readings of their own on the P1 port.
 static const dsmrFieldDefinition euMbusTypeOnlyFields[] =
 {
-  { .obis = "0-?:24.1.0", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-?:24.1.0", .name = "mbusDevTyp", .type = DSMR_FIELD_TYPE_INTEGER, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- COSEM logical device name, used as identity by Swiss style meters.
 static const dsmrFieldDefinition euDeviceNameField[] =
 {
-  { .obis = "0-0:42.0.0", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
+  { .obis = "0-0:42.0.0", .name = "devName", .type = DSMR_FIELD_TYPE_TEXT, .unit = NULL, .maxScale = 0, .groupCount = 1 },
 };
 
 //-- --------------------------------------------------------------------------
@@ -496,6 +504,7 @@ static const dsmrFieldBlock nl50Blocks[] =
   { nlPhaseFields, DSMR_ARRAY_COUNT(nlPhaseFields) },
   { nlPowerQualityFields, DSMR_ARRAY_COUNT(nlPowerQualityFields) },
   { nlMbusFields, DSMR_ARRAY_COUNT(nlMbusFields) },
+  { euMbusLegacyIdField, DSMR_ARRAY_COUNT(euMbusLegacyIdField) },
   { euSagSwellFields, DSMR_ARRAY_COUNT(euSagSwellFields) },
 };
 

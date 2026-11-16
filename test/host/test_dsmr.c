@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: test/host/test_dsmr.c - host tests for the portable C11 core
-//-- Date: 2026-11-16 · Build: 4
+//-- Date: 2026-11-16 · Build: 6
 //--
 //-- Compiles the portable core without ESP-IDF. Run with: make run
 //-- Coverage follows the acceptance list of projectPrompt.md section 7.
@@ -47,6 +47,8 @@ typedef struct
   uint16_t typeMismatchCount;
   bool feedFromCallback;
   dsmrParserStatus reentrantStatus;
+  bool setFromCallback;
+  dsmrParserStatus setLabelStatus;
 } Collector;
 
 static void onEvent(const dsmrParser *parser, const dsmrParserEvent *event, void *userData)
@@ -65,6 +67,11 @@ static void onEvent(const dsmrParser *parser, const dsmrParserEvent *event, void
     {
       static const uint8_t noise[] = "x";
       collector->reentrantStatus = dsmrParserFeed((dsmrParser *)parser, noise, sizeof noise, 1000, onEvent, collector);
+    }
+
+    if (collector->setFromCallback)
+    {
+      collector->setLabelStatus = dsmrParserSetFieldLabel((dsmrParser *)parser, "1-0:1.8.1", "late");
     }
   }
   else
@@ -552,11 +559,248 @@ static void testLabelsAndLookup(void)
   }
 
   const dsmrTelegramField *unlabeled = findLocalField(&collector, "0-0:96.14.0");
-  CHECK(unlabeled != NULL && unlabeled->name == NULL, "field without label has null name");
+  CHECK(unlabeled != NULL && unlabeled->name != NULL && strcmp(unlabeled->name, "tarInd") == 0, "field without application label falls back to the built-in default name");
 
   const dsmrTelegramField *found = NULL;
   CHECK(dsmrResultFindFieldByObis(&collector.result, "0-0:96.14.0", &found) == DSMR_OK && found == unlabeled, "lookup by OBIS code");
   CHECK(dsmrResultFindFieldByObis(&collector.result, "9-9:9.9.9", &found) == DSMR_ERR_NOT_FOUND && found == NULL, "lookup miss reported");
+}
+
+//-- The built-in default display names apply when the application registers
+//-- no label, one registered label overrides just its own code, and unknown
+//-- fields keep a null name. M-Bus wildcard rows supply their default too.
+static void testDefaultFieldNames(void)
+{
+  dsmrParser parser;
+  Collector collector;
+  dsmrParserConfig config;
+  char frame[2048];
+
+  memset(&config, 0, sizeof config);
+  config.countryCode = "NL";
+  config.profileId = "nl.dsmr.4.2";
+  config.unknownFieldPolicy = DSMR_UNKNOWN_FIELD_RAW;
+
+  size_t length = buildFrame(frame, sizeof frame,
+                             "/TEST\r\n\r\n"
+                             "1-3:0.2.8(42)\n"
+                             "1-0:1.8.1(000001.000*kWh)\n"
+                             "0-0:96.14.0(1)\n"
+                             "1-0:32.7.0(230.00*V)\n"
+                             "9-9:99.99.9(123)\n");
+
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for default names");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 1000, 0);
+  CHECK(collector.telegramCount == 1, "default names telegram accepted");
+
+  const dsmrTelegramField *delivered = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((delivered != NULL) && (delivered->name != NULL) && (strcmp(delivered->name, "enrgyDelvrdTar1") == 0), "known field gets its built-in default name");
+
+  const dsmrTelegramField *tariff = findLocalField(&collector, "0-0:96.14.0");
+  CHECK((tariff != NULL) && (tariff->name != NULL) && (strcmp(tariff->name, "tarInd") == 0), "tariff indicator gets its built-in default name");
+
+  const dsmrTelegramField *voltage = findLocalField(&collector, "1-0:32.7.0");
+  CHECK((voltage != NULL) && (voltage->name != NULL) && (strcmp(voltage->name, "voltL1") == 0), "phase voltage gets its built-in default name");
+
+  const dsmrTelegramField *raw = findLocalField(&collector, "9-9:99.99.9");
+  CHECK((raw != NULL) && (raw->name == NULL), "unknown field keeps a null name");
+
+  //-- One registered application label overrides just that code; every
+  //-- other code keeps its built-in default.
+  static const dsmrFieldLabel singleOverride[] =
+  {
+    { .obis = "1-0:1.8.1", .name = "appPick" },
+  };
+
+  config.fieldLabels = singleOverride;
+  config.fieldLabelCount = 1;
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init with a single override");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 2000, 0);
+  CHECK(collector.telegramCount == 1, "override telegram accepted");
+
+  delivered = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((delivered != NULL) && (delivered->name != NULL) && (strcmp(delivered->name, "appPick") == 0), "application label wins over the built-in default");
+  tariff = findLocalField(&collector, "0-0:96.14.0");
+  CHECK((tariff != NULL) && (tariff->name != NULL) && (strcmp(tariff->name, "tarInd") == 0), "unregistered code keeps its default name");
+
+  //-- M-Bus wildcard rows (0-?:24.2.1) supply the default for the concrete
+  //-- channel through the same definition lookup.
+  const dsmrFixture *threePhase = &dsmrFixtures[1];
+  dsmrParser mbusParser;
+  Collector mbusCollector;
+
+  CHECK(initForFixture(&mbusParser, threePhase, NULL, false), "init for default M-Bus names");
+  collectorReset(&mbusCollector);
+  feedAll(&mbusParser, &mbusCollector, threePhase->telegram, strlen(threePhase->telegram), 1500, 0);
+  CHECK(mbusCollector.telegramCount == 1, "three-phase fixture accepted for default M-Bus names");
+
+  const dsmrTelegramField *mbus = findLocalField(&mbusCollector, "0-1:24.2.1");
+  CHECK((mbus != NULL) && (mbus->name != NULL) && (strcmp(mbus->name, "mbusRdng") == 0), "M-Bus wildcard row supplies the default name");
+}
+
+//-- dsmrParserSetFieldLabel renames, replaces and removes one OBIS code at
+//-- run time without rebuilding the table, and reports its error cases.
+static void testSetFieldLabel(void)
+{
+  const dsmrFixture *fixture = &dsmrFixtures[0];
+  dsmrParser parser;
+  Collector collector;
+  dsmrParserConfig config = makeConfig(fixture);
+
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for setter test");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, fixture->telegram, strlen(fixture->telegram), 1000, 0);
+  CHECK(collector.telegramCount == 1, "setter baseline telegram");
+
+  const dsmrTelegramField *field = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((field != NULL) && (field->name != NULL) && (strcmp(field->name, "enrgyDelvrdTar1") == 0), "setter baseline shows the default name");
+
+  CHECK(dsmrParserSetFieldLabel(&parser, "1-0:1.8.1", "gridImportTar1") == DSMR_OK, "override one field");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, fixture->telegram, strlen(fixture->telegram), 2000, 0);
+  field = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((field != NULL) && (field->name != NULL) && (strcmp(field->name, "gridImportTar1") == 0), "single field renamed");
+
+  const dsmrTelegramField *untouched = findLocalField(&collector, "0-0:96.14.0");
+  CHECK((untouched != NULL) && (untouched->name != NULL) && (strcmp(untouched->name, "tarInd") == 0), "other fields keep their defaults");
+
+  //-- A NULL name drops the override and restores the default.
+  CHECK(dsmrParserSetFieldLabel(&parser, "1-0:1.8.1", NULL) == DSMR_OK, "override removed");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, fixture->telegram, strlen(fixture->telegram), 3000, 0);
+  field = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((field != NULL) && (field->name != NULL) && (strcmp(field->name, "enrgyDelvrdTar1") == 0), "default name returns after removal");
+
+  //-- Removing an override that was never set succeeds.
+  CHECK(dsmrParserSetFieldLabel(&parser, "1-0:2.8.1", NULL) == DSMR_OK, "removing an absent override succeeds");
+
+  //-- Replacing an existing entry reuses its slot; removal shifts the
+  //-- remaining entries so none is lost.
+  static const dsmrFieldLabel baseLabels[] =
+  {
+    { .obis = "1-0:1.8.1", .name = "first" },
+    { .obis = "0-0:96.14.0", .name = "second" },
+  };
+
+  config = makeConfig(fixture);
+  config.fieldLabels = baseLabels;
+  config.fieldLabelCount = 2;
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for replace and shift");
+  CHECK(dsmrParserSetFieldLabel(&parser, "1-0:1.8.1", NULL) == DSMR_OK, "remove first of two entries");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, fixture->telegram, strlen(fixture->telegram), 4000, 0);
+  field = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((field != NULL) && (field->name != NULL) && (strcmp(field->name, "enrgyDelvrdTar1") == 0), "removed entry fell back to its default");
+  field = findLocalField(&collector, "0-0:96.14.0");
+  CHECK((field != NULL) && (field->name != NULL) && (strcmp(field->name, "second") == 0), "shifted entry kept its label");
+
+  //-- Argument validation.
+  CHECK(dsmrParserSetFieldLabel(NULL, "1-0:1.8.1", "x") == DSMR_ERR_NULL_ARGUMENT, "null parser rejected");
+  CHECK(dsmrParserSetFieldLabel(&parser, NULL, "x") == DSMR_ERR_NULL_ARGUMENT, "null obis rejected");
+  CHECK(dsmrParserSetFieldLabel(&parser, "", "x") == DSMR_ERR_INVALID_CONFIG, "empty obis rejected");
+  CHECK(dsmrParserSetFieldLabel(&parser, "1-0:12345678.7.8", "x") == DSMR_ERR_INVALID_CONFIG, "oversized obis rejected");
+  CHECK(dsmrParserSetFieldLabel(&parser, "1-0:1.8.1", "012345678901234567890123456789012") == DSMR_ERR_INVALID_CONFIG, "oversized name rejected");
+
+  dsmrParser fresh;
+  memset(&fresh, 0, sizeof fresh);
+  CHECK(dsmrParserSetFieldLabel(&fresh, "1-0:1.8.1", "x") == DSMR_ERR_NOT_INITIALIZED, "uninitialised parser rejected");
+
+  //-- Re-entry from the event callback is refused like the other operations.
+  dsmrParser reentry;
+  dsmrParserConfig reentryConfig = makeConfig(fixture);
+
+  CHECK(dsmrParserInit(&reentry, &reentryConfig, workspace, sizeof workspace) == DSMR_OK, "init for setter reentrancy");
+  collectorReset(&collector);
+  collector.setFromCallback = true;
+  feedAll(&reentry, &collector, fixture->telegram, strlen(fixture->telegram), 5000, 0);
+  CHECK(collector.telegramCount == 1, "telegram delivered for setter reentrancy");
+  CHECK(collector.setLabelStatus == DSMR_ERR_REENTRANT_CALL, "setter from callback refused");
+
+  //-- A full override table reports insufficient workspace and the parser
+  //-- keeps decoding.
+  char obisBuf[16];
+  char nameBuf[32];
+
+  for (uint16_t index = 0; index < DSMR_MAX_FIELD_LABELS + 2u; index++)
+  {
+    (void)snprintf(obisBuf, sizeof obisBuf, "9-9:1.%u.%u", (unsigned)(index / 100u), (unsigned)(index % 100u));
+    (void)snprintf(nameBuf, sizeof nameBuf, "fill%u", (unsigned)index);
+
+    if (dsmrParserSetFieldLabel(&parser, obisBuf, nameBuf) != DSMR_OK)
+    {
+      break;
+    }
+  }
+
+  CHECK(dsmrParserSetFieldLabel(&parser, "9-9:2.0.0", "overflow") == DSMR_ERR_INSUFFICIENT_WORKSPACE, "full label table rejected");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, fixture->telegram, strlen(fixture->telegram), 6000, 0);
+  CHECK(collector.telegramCount == 1, "parser still decodes with a full label table");
+}
+
+//-- Every built-in field row carries a default name within the label bound,
+//-- and the same OBIS code carries the same default in every profile.
+static void testDefaultNameConsistency(void)
+{
+  static const char *seenObis[128];
+  static const char *seenNames[128];
+  uint16_t seenCount = 0;
+  uint16_t rowCount = 0;
+
+  const char *const *ids = dsmrProfileListIds();
+
+  for (uint16_t idIndex = 0; ids[idIndex] != NULL; idIndex++)
+  {
+    const dsmrProfile *profile = dsmrProfileLookup(ids[idIndex]);
+    CHECK(profile != NULL, "built-in profile id resolves");
+
+    if (profile == NULL)
+    {
+      continue;
+    }
+
+    for (uint16_t block = 0; block < profile->fieldBlockCount; block++)
+    {
+      const dsmrFieldDefinition *entries = profile->fieldBlocks[block].entries;
+
+      for (uint16_t entry = 0; entry < profile->fieldBlocks[block].count; entry++)
+      {
+        rowCount++;
+        CHECK(entries[entry].name != NULL, "built-in field row carries a default name");
+
+        if (entries[entry].name == NULL)
+        {
+          continue;
+        }
+
+        CHECK(strlen(entries[entry].name) < DSMR_MAX_LABEL_NAME_LEN, "default name fits the label bound");
+
+        bool known = false;
+
+        for (uint16_t prior = 0; prior < seenCount; prior++)
+        {
+          if (strcmp(seenObis[prior], entries[entry].obis) == 0)
+          {
+            known = true;
+            CHECK(strcmp(seenNames[prior], entries[entry].name) == 0, "same obis code carries the same default in every profile");
+            break;
+          }
+        }
+
+        if (!known && (seenCount < (sizeof seenObis / sizeof seenObis[0])))
+        {
+          seenObis[seenCount] = entries[entry].obis;
+          seenNames[seenCount] = entries[entry].name;
+          seenCount++;
+        }
+      }
+    }
+  }
+
+  CHECK(rowCount >= 150u, "all profile blocks were walked");
+  CHECK(seenCount >= 90u, "the whole shared dictionary was seen");
 }
 
 static const dsmrMbusDevice twoDevicesWater[] =
@@ -1202,6 +1446,9 @@ int main(void)
   testOversizeAndRecovery();
   testDataLoss();
   testLabelsAndLookup();
+  testDefaultFieldNames();
+  testSetFieldLabel();
+  testDefaultNameConsistency();
   testApplyConfig();
   testAutoProfileSelection();
   testUnknownMinorVersionOption();

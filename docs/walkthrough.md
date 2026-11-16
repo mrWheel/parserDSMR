@@ -1,6 +1,6 @@
 # One telegram through the parser
 
-**Date:** 2026-11-16 · **Build:** 4
+**Date:** 2026-11-16 · **Build:** 6
 
 This walkthrough follows the fixture `F1 nl.dsmr.4.2 single-phase` from UART
 bytes to the result callback. It is the reading path from UART bytes to the
@@ -80,8 +80,11 @@ numberings are accepted for `0-n:24.1.0`: the Dutch DSMR numbering
 (1=gas, 2=water, 3=heat) and the EN 13757-3 numbering documented in the
 European P1 OBIS overview and the Luxembourg example (3=gas, 4=heat,
 7=water); only a value that neither numbering explains contradicts the
-declaration. Every accepted field is resolved against the application
-label table; fields without a label remain reachable through
+declaration. Every accepted field is named by first resolving it
+against the application label table (configuration or
+`dsmrParserSetFieldLabel`), then against the built-in default display name
+of its field-table row; a field with neither — an unknown field kept by the
+raw policy — keeps `name == NULL` and remains reachable through
 `dsmrResultFindFieldByObis`.
 
 ## 7. The result callback

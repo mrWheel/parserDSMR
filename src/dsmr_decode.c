@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_decode.c - OBIS line decoding of a stored candidate
-//-- Date: 2026-11-16 · Build: 4
+//-- Date: 2026-11-16 · Build: 6
 //-- ==========================================================================
 
 #include "dsmr_decode.h"
@@ -139,7 +139,9 @@ static bool publishedValueMatchesDeviceType(int64_t published, dsmrMbusDeviceTyp
   }
 }
 
-//-- Resolves the application label for an OBIS code, or NULL.
+//-- Resolves the application label override for an OBIS code, or NULL when
+//-- the application registered none. Field names added at run time through
+//-- dsmrParserSetFieldLabel are part of this copied table and win here too.
 static const char *resolveLabel(const dsmrParserConfig *config, const char *obis)
 {
   if ((config == NULL) || (config->fieldLabels == NULL))
@@ -289,8 +291,9 @@ static int splitLine(char *line, const char **obis, char **groups, uint8_t group
 }
 
 //-- Adds a field to the ordered result array. Returns false when the array
-//-- is full.
-static bool addField(DecodeContext *ctx, const char *obis, uint8_t channel, const dsmrValue *value, const char *unit, const dsmrTimestamp *timestamp, dsmrFieldClass classification)
+//-- is full. The name is the application label override when present, else
+//-- the built-in default display name of the field definition, else NULL.
+static bool addField(DecodeContext *ctx, const char *obis, uint8_t channel, const dsmrValue *value, const char *unit, const dsmrTimestamp *timestamp, dsmrFieldClass classification, const dsmrFieldDefinition *definition)
 {
   if (ctx->output->fieldCount >= ctx->input->fieldCapacity)
   {
@@ -303,6 +306,12 @@ static bool addField(DecodeContext *ctx, const char *obis, uint8_t channel, cons
   field->obis = obis;
   field->mbusChannel = channel;
   field->name = resolveLabel(ctx->input->config, obis);
+
+  if ((field->name == NULL) && (definition != NULL))
+  {
+    field->name = definition->name;
+  }
+
   field->value = *value;
   field->unit = unit;
   field->classification = classification;
@@ -349,7 +358,7 @@ static bool addUnknownField(DecodeContext *ctx, const char *obis, uint8_t channe
   dsmrValue value;
   dsmrValueSetText(&value, (text != NULL) ? text : "");
 
-  if (!addField(ctx, obis, channel, &value, NULL, NULL, DSMR_FIELD_CLASS_UNKNOWN))
+  if (!addField(ctx, obis, channel, &value, NULL, NULL, DSMR_FIELD_CLASS_UNKNOWN, NULL))
   {
     rejectWith(ctx, DSMR_DIAG_SIZE_LIMIT, obis, linePosition);
     return false;
@@ -568,7 +577,7 @@ static bool decodeLine(DecodeContext *ctx, char *line, size_t lineLength, size_t
     }
   }
 
-  if (!addField(ctx, obis, channel, &value, definition->unit, hasTimestamp ? &timestamp : NULL, DSMR_FIELD_CLASS_KNOWN))
+  if (!addField(ctx, obis, channel, &value, definition->unit, hasTimestamp ? &timestamp : NULL, DSMR_FIELD_CLASS_KNOWN, definition))
   {
     rejectWith(ctx, DSMR_DIAG_SIZE_LIMIT, obis, linePosition);
     return false;

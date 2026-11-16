@@ -1,13 +1,16 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_parser.c - public API, framing glue and event dispatch
-//-- Date: 2026-11-16 · Build: 3
+//-- Date: 2026-11-16 · Build: 5
 //--
 //-- The parser owns no memory of its own. The workspace is carved into the
 //-- telegram buffer, the field array, and the deep copies of the M-Bus
 //-- device table and the label table. Every value the parser needs survives
-//-- the dsmrParserInit and dsmrParserApplyConfig calls, so the caller's
-//-- configuration and tables may go out of scope afterwards.
+//-- the dsmrParserInit, dsmrParserApplyConfig and dsmrParserSetFieldLabel
+//-- calls, so the caller's configuration and tables may go out of scope
+//-- afterwards. dsmrParserSetFieldLabel adds, replaces or removes one entry
+//-- in the copied label table in place; the built-in default display names
+//-- live in the profile tables in flash and cost no workspace.
 //-- ==========================================================================
 
 #include "dsmr_parser.h"
@@ -80,6 +83,19 @@ static uint16_t effectiveLineBytes(const dsmrParserConfig *config)
 static uint16_t effectiveMaxFields(const dsmrParserConfig *config)
 {
   return (config->maxFields != 0u) ? config->maxFields : DSMR_DEFAULT_MAX_FIELDS;
+}
+
+//-- One label occupies a fixed obis slot followed by a fixed name slot in
+//-- the pool so dsmrParserSetFieldLabel can add and remove entries without
+//-- moving storage around.
+static char *labelObisSlotAt(char *pool, uint16_t index)
+{
+  return pool + ((size_t)index * (DSMR_MAX_LABEL_OBIS_LEN + DSMR_MAX_LABEL_NAME_LEN));
+}
+
+static char *labelNameSlotAt(char *pool, uint16_t index)
+{
+  return labelObisSlotAt(pool, index) + DSMR_MAX_LABEL_OBIS_LEN;
 }
 
 //-- --------------------------------------------------------------------------
@@ -249,8 +265,8 @@ static void applyConfigToParser(dsmrParser *parser, const dsmrParserConfig *conf
 
   for (uint16_t index = 0; index < config->fieldLabelCount; index++)
   {
-    char *obisSlot = pool + ((size_t)index * (DSMR_MAX_LABEL_OBIS_LEN + DSMR_MAX_LABEL_NAME_LEN));
-    char *nameSlot = obisSlot + DSMR_MAX_LABEL_OBIS_LEN;
+    char *obisSlot = labelObisSlotAt(pool, index);
+    char *nameSlot = labelNameSlotAt(pool, index);
 
     copyBounded(obisSlot, DSMR_MAX_LABEL_OBIS_LEN, config->fieldLabels[index].obis);
     copyBounded(nameSlot, DSMR_MAX_LABEL_NAME_LEN, config->fieldLabels[index].name);
@@ -277,6 +293,9 @@ static void applyConfigToParser(dsmrParser *parser, const dsmrParserConfig *conf
   parser->fieldArray = fieldArray;
   parser->fieldCapacity = maxFields;
   parser->rawCopy = rawCopy;
+  parser->labelTable = labelCopy;
+  parser->labelCount = config->fieldLabelCount;
+  parser->labelPool = pool;
 
   dsmrFramingInit(&parser->framing, telegramBuffer, telegramBytes);
   parser->hasLastByte = false;
@@ -592,6 +611,103 @@ dsmrParserStatus dsmrParserApplyConfig(dsmrParser *parser, const dsmrParserConfi
   //-- A partial telegram in progress is discarded. The new values govern the
   //-- next telegram from the initial framing state.
   applyConfigToParser(parser, config, profile);
+  return DSMR_OK;
+}
+
+//-- Keeps the configuration's label view in sync with the live table after
+//-- dsmrParserSetFieldLabel changed it.
+static void syncLabelTable(dsmrParser *parser)
+{
+  parser->config.fieldLabels = (parser->labelCount > 0u) ? parser->labelTable : NULL;
+  parser->config.fieldLabelCount = parser->labelCount;
+}
+
+dsmrParserStatus dsmrParserSetFieldLabel(dsmrParser *parser, const char *obis, const char *name)
+{
+  if ((parser == NULL) || (obis == NULL))
+  {
+    return DSMR_ERR_NULL_ARGUMENT;
+  }
+
+  if (!parser->initialized)
+  {
+    return DSMR_ERR_NOT_INITIALIZED;
+  }
+
+  if (parser->inCallback)
+  {
+    return DSMR_ERR_REENTRANT_CALL;
+  }
+
+  if ((obis[0] == '\0') || (strlen(obis) >= DSMR_MAX_LABEL_OBIS_LEN))
+  {
+    return DSMR_ERR_INVALID_CONFIG;
+  }
+
+  if ((name != NULL) && (strlen(name) >= DSMR_MAX_LABEL_NAME_LEN))
+  {
+    return DSMR_ERR_INVALID_CONFIG;
+  }
+
+  for (uint16_t index = 0; index < parser->labelCount; index++)
+  {
+    if (strcmp(parser->labelTable[index].obis, obis) != 0)
+    {
+      continue;
+    }
+
+    //-- The code is already overridden; replace the name or remove it.
+    if (name == NULL)
+    {
+      //-- Removing an override lets the field fall back to its built-in
+      //-- default. Later entries shift down one slot so the table stays
+      //-- compact; each entry then points at its own slot again.
+      for (uint16_t move = index; (move + 1u) < parser->labelCount; move++)
+      {
+        char *dstObis = labelObisSlotAt(parser->labelPool, move);
+        char *dstName = labelNameSlotAt(parser->labelPool, move);
+
+        copyBounded(dstObis, DSMR_MAX_LABEL_OBIS_LEN, labelObisSlotAt(parser->labelPool, move + 1u));
+        copyBounded(dstName, DSMR_MAX_LABEL_NAME_LEN, labelNameSlotAt(parser->labelPool, move + 1u));
+
+        parser->labelTable[move].obis = dstObis;
+        parser->labelTable[move].name = dstName;
+      }
+
+      parser->labelCount--;
+    }
+    else
+    {
+      copyBounded(labelNameSlotAt(parser->labelPool, index), DSMR_MAX_LABEL_NAME_LEN, name);
+    }
+
+    syncLabelTable(parser);
+    return DSMR_OK;
+  }
+
+  //-- Removing an override that was never registered succeeds trivially.
+  if (name == NULL)
+  {
+    return DSMR_OK;
+  }
+
+  if (parser->labelCount >= DSMR_MAX_FIELD_LABELS)
+  {
+    return DSMR_ERR_INSUFFICIENT_WORKSPACE;
+  }
+
+  uint16_t index = parser->labelCount;
+  char *obisSlot = labelObisSlotAt(parser->labelPool, index);
+  char *nameSlot = labelNameSlotAt(parser->labelPool, index);
+
+  copyBounded(obisSlot, DSMR_MAX_LABEL_OBIS_LEN, obis);
+  copyBounded(nameSlot, DSMR_MAX_LABEL_NAME_LEN, name);
+
+  parser->labelTable[index].obis = obisSlot;
+  parser->labelTable[index].name = nameSlot;
+  parser->labelCount++;
+
+  syncLabelTable(parser);
   return DSMR_OK;
 }
 

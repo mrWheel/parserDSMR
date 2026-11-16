@@ -1,6 +1,6 @@
 # parserDSMR — test results
 
-**Date:** 2026-11-16 · **Build:** 3
+**Date:** 2026-11-16 · **Build:** 4
 
 This file records how parserDSMR is tested, which telegrams are used as
 test material, and the result of the most recent run. It covers every
@@ -29,14 +29,21 @@ projectPrompt.md section 7.
 $ cd test/host && make run
 cc -std=c11 -Wall -Wextra -Wpedantic -Werror -g -fsanitize=address,undefined ...
 ./test_dsmr
-626 checks, 0 failures
+2153 checks, 0 failures
 ```
 
-Result: **626 checks, 0 failures** (2026-11-16). No `FAIL` lines were
+Result: **2153 checks, 0 failures** (2026-11-16). No `FAIL` lines were
 printed. In addition to the fixtures below, the run covers: the CRC
 check value `0xBB3D`, a sample telegram, init error cases, multiple
 frames per buffer, frame and inter-byte timeouts, oversize input, UART
-data loss, label tables and OBIS lookup, `dsmrParserApplyConfig`
+data loss, label tables and OBIS lookup, the built-in default field
+names (defaults in use without an application table, application label
+precedence, unknown fields left unnamed, M-Bus wildcard rows resolving
+their default), `dsmrParserSetFieldLabel` (set, replace, remove and
+restore-default, argument validation, re-entrancy refusal and the
+full-table `DSMR_ERR_INSUFFICIENT_WORKSPACE` error), default-name
+consistency across all built-in profiles (every row named within the
+label bound, one name per OBIS code), `dsmrParserApplyConfig`
 behaviour, automatic 4.0/4.2 selection, the unknown-minor-version
 option, M-Bus channels and device types (both numberings, see §5),
 value states and timestamps, value formatting, the LF compatibility

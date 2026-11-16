@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: include/dsmr_parser.h - public C API of the portable core
-//-- Date: 2026-11-16 · Build: 3
+//-- Date: 2026-11-16 · Build: 5
 //--
 //-- Portable ISO C11 core. This header uses standard C headers only and has
 //-- no ESP-IDF dependency. The same sources compile for the ESP-IDF component
@@ -11,8 +11,9 @@
 //--   The application owns the dsmrParser instance and the workspace array.
 //--   The parser performs no dynamic allocation during reception or decoding.
 //--   The application owns every string the dsmrParserConfig references. The
-//--   parser copies the values it needs during dsmrParserInit and
-//--   dsmrParserApplyConfig and does not retain the caller's pointers.
+//--   parser copies the values it needs during dsmrParserInit,
+//--   dsmrParserApplyConfig and dsmrParserSetFieldLabel and does not retain
+//--   the caller's pointers.
 //--   Views handed out in a dsmrTelegramResult or dsmrDiagnostic stay valid
 //--   only for the duration of the event callback. Copy what you keep.
 //--   One instance is owned by one task. Calling back into the parser from
@@ -176,6 +177,11 @@ typedef struct
   dsmrMbusDeviceType deviceType;
 } dsmrMbusDevice;
 
+//-- Application override for one OBIS code. The table takes precedence over
+//-- the built-in default display names carried by the profile field tables:
+//-- an application only registers the few codes it wants to rename. A
+//-- resolved field with neither an application label nor a built-in default
+//-- keeps name == NULL and remains reachable by its OBIS code.
 typedef struct
 {
   const char *obis;
@@ -219,6 +225,11 @@ typedef enum
 //--   logPrefixGroups  LOG only: groups before the repeating records,
 //--                    including the record count group.
 //--   logEntryGroups   LOG only: groups per repeating record.
+//--   name             built-in default display name used when the
+//--                    application registers no label for the code. The
+//--                    application label table always wins; NULL yields no
+//--                    default (application tables may leave it unset).
+//--                    Kept last so positional initializers stay valid.
 typedef struct
 {
   const char *obis;
@@ -229,6 +240,7 @@ typedef struct
   uint8_t flags;
   uint8_t logPrefixGroups;
   uint8_t logEntryGroups;
+  const char *name;
 } dsmrFieldDefinition;
 
 #define DSMR_FIELD_FLAG_REPEATABLE 0x01u
@@ -303,6 +315,9 @@ typedef enum
   DSMR_FIELD_CLASS_UNKNOWN,
 } dsmrFieldClass;
 
+//-- One received field. name is the application label when one is
+//-- registered for the code, else the built-in default display name from
+//-- the profile field table, else NULL.
 typedef struct
 {
   const char *obis;
@@ -400,6 +415,9 @@ typedef struct dsmrParser_s
   dsmrTelegramField *fieldArray;
   uint16_t fieldCapacity;
   uint8_t *rawCopy;
+  dsmrFieldLabel *labelTable;
+  uint16_t labelCount;
+  char *labelPool;
   dsmrFraming framing;
   uint32_t lastByteTimeMs;
   uint32_t frameStartMs;
@@ -438,6 +456,19 @@ void dsmrParserReset(dsmrParser *parser);
 //-- yields a distinct error and leaves the previous configuration fully
 //-- active. The event callback shall not call this on its own instance.
 dsmrParserStatus dsmrParserApplyConfig(dsmrParser *parser, const dsmrParserConfig *config);
+
+//-- Sets, replaces or removes a single application label override on a live
+//-- instance without rebuilding the label table. The override matches the
+//-- exact OBIS code as received (concrete M-Bus channels included) and wins
+//-- over the built-in default display name of the field. Passing a NULL name
+//-- removes the override so the field falls back to its built-in default;
+//-- removing an absent override succeeds. The parser copies both strings.
+//-- Overrides added here live in the same storage as the configuration
+//-- table and share the DSMR_MAX_FIELD_LABELS bound; a full table yields
+//-- DSMR_ERR_INSUFFICIENT_WORKSPACE. The next dsmrParserApplyConfig restores
+//-- the table from the configuration. The event callback shall not call this
+//-- on its own instance.
+dsmrParserStatus dsmrParserSetFieldLabel(dsmrParser *parser, const char *obis, const char *name);
 
 //-- Reports an external data-loss event, such as a UART ring buffer overrun.
 //-- The partial frame is discarded and a data-loss diagnostic is delivered.

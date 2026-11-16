@@ -1,12 +1,19 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: main/app_main.c - built-in test telegram replay demo
-//-- Date: 2026-11-16 · Build: 1
+//-- Date: 2026-11-16 · Build: 3
 //--
 //-- Default application of the repository. It replays the built-in sample
 //-- telegram through the parser from the USB console, without any P1 wiring,
 //-- and logs the component version, one line per summary item and one line
 //-- per decoded field.
+//--
+//-- Fields are named from the built-in default display names of the parser.
+//-- Exactly two fields are renamed through dsmrParserSetFieldLabel so the
+//-- monitor shows the defaults in use and a single-field override next to
+//-- them. The application label table of the fixtures is deliberately not
+//-- used here; examples/stored_telegram demonstrates the full-table swap
+//-- through dsmrParserApplyConfig.
 //-- ==========================================================================
 
 #include <string.h>
@@ -14,7 +21,6 @@
 #include "esp_log.h"
 
 #include "dsmr_parser.h"
-#include "dsmr_sample_labels.h"
 #include "dsmr_sample_telegram.h"
 
 static const char *TAG = "parserDSMR";
@@ -61,7 +67,7 @@ static void onEvent(const dsmrParser *parserInstance, const dsmrParserEvent *eve
 
       if (field->mbusChannel != 0u)
       {
-        ESP_LOGI(TAG, "  ch%u %-12s %-24s = %s %s",
+        ESP_LOGI(TAG, "  ch%u %-12s %-28s = %s %s",
                  (unsigned)field->mbusChannel,
                  field->obis,
                  (field->name != NULL) ? field->name : "-",
@@ -70,7 +76,7 @@ static void onEvent(const dsmrParser *parserInstance, const dsmrParserEvent *eve
       }
       else
       {
-        ESP_LOGI(TAG, "  %-12s %-24s = %s %s",
+        ESP_LOGI(TAG, "  %-12s %-28s = %s %s",
                  field->obis,
                  (field->name != NULL) ? field->name : "-",
                  value,
@@ -87,19 +93,39 @@ static void onEvent(const dsmrParser *parserInstance, const dsmrParserEvent *eve
   }
 }
 
+//-- Single-field overrides on top of the built-in default names. Every
+//-- other field keeps its library default, so the monitor shows both.
+static void applyLabelOverrides(void)
+{
+  static const dsmrFieldLabel overrides[] =
+  {
+    { .obis = "1-0:1.8.2", .name = "energyDeliveredTariff2-changed" },
+    { .obis = "1-0:2.8.2", .name = "energyReturnedTariff2-changed" },
+  };
+
+  for (size_t index = 0; index < sizeof overrides / sizeof overrides[0]; index++)
+  {
+    dsmrParserStatus status = dsmrParserSetFieldLabel(&parser, overrides[index].obis, overrides[index].name);
+
+    if (status != DSMR_OK)
+    {
+      ESP_LOGE(TAG, "Label override for %s failed: %s", overrides[index].obis, dsmrStatusToString(status));
+    }
+  }
+}
+
 void app_main(void)
 {
   //-- Version of the parser component as reported by the component itself.
   ESP_LOGI(TAG, "Component parserDSMR version [%s]", dsmrParserVersion());
 
+  //-- No fieldLabels table: the built-in default display names are used.
   const dsmrParserConfig config =
   {
     .countryCode = "NL",
     .profileId = "nl.dsmr.5.0",
     .mbusDevices = mbusDevices,
     .mbusDeviceCount = (uint8_t)(sizeof mbusDevices / sizeof mbusDevices[0]),
-    .fieldLabels = dsmrSampleLabels,
-    .fieldLabelCount = (uint16_t)(sizeof dsmrSampleLabels / sizeof dsmrSampleLabels[0]),
     .unknownFieldPolicy = DSMR_UNKNOWN_FIELD_RAW,
   };
 
@@ -112,6 +138,9 @@ void app_main(void)
     ESP_LOGE(TAG, "Parser initialization failed: %s", dsmrStatusToString(status));
     return;
   }
+
+  ESP_LOGI(TAG, "Using built-in default field names; two fields are overridden through dsmrParserSetFieldLabel");
+  applyLabelOverrides();
 
   status = dsmrParserFeed(&parser,
                           (const uint8_t *)dsmrSampleTelegram,

@@ -1,6 +1,6 @@
 # parserDSMR — test results
 
-**Date:** 2026-11-16 · **Build:** 4
+**Date:** 2026-11-16 · **Build:** 6
 
 This file records how parserDSMR is tested, which telegrams are used as
 test material, and the result of the most recent run. It covers every
@@ -29,10 +29,10 @@ projectPrompt.md section 7.
 $ cd test/host && make run
 cc -std=c11 -Wall -Wextra -Wpedantic -Werror -g -fsanitize=address,undefined ...
 ./test_dsmr
-2153 checks, 0 failures
+2154 checks, 0 failures
 ```
 
-Result: **2153 checks, 0 failures** (2026-11-16). No `FAIL` lines were
+Result: **2154 checks, 0 failures** (2026-11-16). No `FAIL` lines were
 printed. In addition to the fixtures below, the run covers: the CRC
 check value `0xBB3D`, a sample telegram, init error cases, multiple
 frames per buffer, frame and inter-byte timeouts, oversize input, UART
@@ -48,8 +48,10 @@ behaviour, automatic 4.0/4.2 selection, the unknown-minor-version
 option, M-Bus channels and device types (both numberings, see §5),
 value states and timestamps, value formatting, the LF compatibility
 mode, the re-entrancy guard, custom profiles, the unknown-field policy,
-country matching for all European profiles, and the requirement that
-every built-in profile has at least one accepted fixture.
+country matching for all European profiles, the version getter (never
+NULL, version-free shape checks so the test never pins the current
+version) and the requirement that every built-in profile has at least
+one accepted fixture.
 
 ## 3. Test telegrams (fixture catalogue)
 

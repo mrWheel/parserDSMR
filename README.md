@@ -1,6 +1,6 @@
 # parserDSMR — DSMR/P1 smart-meter telegram parser
 
-**Date:** 2026-11-16 · **Build:** 8
+**Date:** 2026-11-16 · **Build:** 10
 
 parserDSMR is a reusable C library that reads and parses P1 telegrams from
 European (Dutch, Belgian, Hungarian, Swedish, Finnish, Lithuanian, Irish,
@@ -91,8 +91,8 @@ repository root. The component registers itself with
 `esp_driver_gpio` and `esp_timer`.
 
 The component is **not yet published** to the ESP Component Registry (the
-manifest `idf_component.yml` is prepared for v0.9.0). Until then there are
-two ways to use it in your own ESP-IDF project.
+manifest `idf_component.yml` is prepared for release). Until then there
+are two ways to use it in your own ESP-IDF project.
 
 **Option A — reference the checkout with EXTRA_COMPONENT_DIRS.** Add the
 repository's `components/` directory to the search path in your project's
@@ -605,6 +605,42 @@ This delivers `DSMR_DIAG_DATA_LOSS` and returns the framer to seeking.
 returns the instance to its initial framing state, keeping the
 configuration — useful after a meter reboot or a mode switch.
 
+### Reading the library version
+
+The library version lives in exactly one place: the `PROG_VERSION`
+constant in `src/dsmr_parser.c`. The only other file that carries the
+number is `idf_component.yml`, because the ESP Component Registry needs
+a static `version:` field it can read without compiling C; the two are
+always kept in sync. The version is deliberately not declared in a
+public header, so calling programs must not reference the constant
+directly. The supported way to read it is the accessor
+`dsmrParserVersion()`, declared in `dsmr_parser.h`:
+
+```c
+#include <stdio.h>
+
+#include "dsmr_parser.h"
+
+//-- dsmrParserVersion() returns the library version string (PROG_VERSION).
+//-- The returned pointer is stable for the lifetime of the program and
+//-- never NULL; the storage belongs to the parser, so do not free or
+//-- modify it.
+printf("parserDSMR %s\n", dsmrParserVersion());
+```
+
+No parser instance is needed — the version is library-wide, so the call
+is safe before (and after) `dsmrParserInit()`. It never allocates and
+never fails, which makes it cheap enough to print once at startup, for
+example in a boot log next to the ESP-IDF version:
+
+```c
+#include "esp_system.h"
+
+printf("parserDSMR %s on ESP-IDF %s\n",
+       dsmrParserVersion(),
+       esp_get_idf_version());
+```
+
 ### Describing a meter with a custom profile
 
 When no built-in profile fits, pass a `customProfile` you own. The unit of
@@ -1103,8 +1139,7 @@ parserDSMR/
 - The Arduino packaging (`library.properties`, examples) follows the
   ESP-IDF release; `src/` is already the Arduino source directory and the
   public header provides C linkage.
-- Publishing to the ESP Component Registry is pending (manifest prepared,
-  v0.9.0).
+- Publishing to the ESP Component Registry is pending (manifest prepared).
 
 ## License
 

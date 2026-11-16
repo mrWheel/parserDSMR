@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: include/dsmr_parser.h - public C API of the portable core
-//-- Date: 2026-11-16 · Build: 5
+//-- Date: 2026-11-16 · Build: 6
 //--
 //-- Portable ISO C11 core. This header uses standard C headers only and has
 //-- no ESP-IDF dependency. The same sources compile for the ESP-IDF component
@@ -488,8 +488,10 @@ const char *dsmrStatusToString(dsmrParserStatus status);
 const char *dsmrDiagReasonToString(dsmrDiagReason reason);
 const char *dsmrFieldClassToString(dsmrFieldClass classification);
 
-//-- Library version string, e.g. "v0.9.0". The returned pointer is stable for
-//-- the lifetime of the program and never NULL; the storage belongs to the
+//-- Library version string. The version literal lives only in
+//-- src/dsmr_parser.c (PROG_VERSION); callers read it through this getter
+//-- instead of hardcoding a copy. The returned pointer is stable for the
+//-- lifetime of the program and never NULL; the storage belongs to the
 //-- parser, the caller must not free or modify it.
 const char *dsmrParserVersion(void);
 

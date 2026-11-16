@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_parser.c - public API, framing glue and event dispatch
-//-- Date: 2026-11-16 · Build: 5
+//-- Date: 2026-11-16 · Build: 6
 //--
 //-- The parser owns no memory of its own. The workspace is carved into the
 //-- telegram buffer, the field array, and the deep copies of the M-Bus
@@ -26,7 +26,7 @@
 //-- Library version. Kept in exactly one place; the version travels with the
 //-- source file headers (Date/Build) and with idf_component.yml. Callers read
 //-- it through dsmrParserVersion().
-const char *PROG_VERSION = "v0.9.0";
+const char *PROG_VERSION = "v0.9.1";
 
 //-- --------------------------------------------------------------------------
 //-- Small helpers

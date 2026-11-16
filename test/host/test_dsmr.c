@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: test/host/test_dsmr.c - host tests for the portable C11 core
-//-- Date: 2026-11-16 · Build: 6
+//-- Date: 2026-11-16 · Build: 7
 //--
 //-- Compiles the portable core without ESP-IDF. Run with: make run
 //-- Coverage follows the acceptance list of projectPrompt.md section 7.
@@ -229,8 +229,13 @@ static void testCrcCheckValue(void)
 static void testVersionString(void)
 {
   //-- The getter must hand out the parser's own version without allocation.
-  CHECK(dsmrParserVersion() != NULL, "dsmrParserVersion never NULL");
-  CHECK(strcmp(dsmrParserVersion(), "v0.9.0") == 0, "dsmrParserVersion reports v0.9.0");
+  //-- The literal itself lives only in src/dsmr_parser.c (PROG_VERSION), so
+  //-- these checks verify the shape of the string and never pin its value.
+  const char *version = dsmrParserVersion();
+
+  CHECK(version != NULL, "dsmrParserVersion never NULL");
+  CHECK(version[0] == 'v', "dsmrParserVersion starts with 'v'");
+  CHECK(strlen(version) > 1, "dsmrParserVersion is not empty");
 }
 
 static void testSampleTelegram(void)

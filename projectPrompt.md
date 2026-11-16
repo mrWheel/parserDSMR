@@ -1,6 +1,6 @@
 # DSMR/P1 Parser — Project Specification
 
-**Date:** 2026-11-14 · **Build:** 3
+**Date:** 2026-11-16 · **Build:** 4
 
 ## 1. Product and scope
 

@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_framing.c - readable ASCII framing state machine
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //-- ==========================================================================
 
 #include "dsmr_framing.h"

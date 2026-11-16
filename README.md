@@ -1,13 +1,25 @@
 # parserDSMR — DSMR/P1 smart-meter telegram parser
 
-**Date:** 2026-11-14 · **Build:** 2
+**Date:** 2026-11-16 · **Build:** 5
 
 parserDSMR is a reusable C library that reads and parses P1 telegrams from
-Dutch and Belgian smart electricity meters. Point it at the P1 port of a
+European (Dutch, Belgian, Hungarian, Swedish, Finnish, Lithuanian, Irish,
+Luxembourg and Swiss) smart electricity meters. Point it at the P1 port of a
 meter — or at a stored buffer of bytes — and it turns the raw serial stream
 into structured, decoded fields you can act upon: energy delivered per
 tariff, current power, voltage and current per phase, M-Bus gas/water/heat
 readings, tariff indicator, text messages and more.
+
+**Scope.** The parser supports only countries and systems that publish
+plain-text P1 telegrams with OBIS fields carrying the same electrical and
+protocol-layer values as the Dutch and Belgian smart meters — the
+DSMR/eMUCs telegram format. The UART baud rate, the RX polarity and the
+transfer interval may deviate per country and are configured per profile.
+Meters whose customer interface uses another wire encoding — an
+encrypted-only H1 port, DLMS/COSEM over HDLC or the Norwegian wired M-Bus
+HAN — are outside this scope; they need a separate transport decoder in
+front of the parser that hands over the decrypted or decoded plain-text
+telegram.
 
 The portable core is plain ISO C11: no operating system, no dynamic
 allocation, no locale dependence. The first release ships as an ESP-IDF
@@ -73,7 +85,7 @@ repository root. The component registers itself with
 `esp_driver_gpio` and `esp_timer`.
 
 The component is **not yet published** to the ESP Component Registry (the
-manifest `idf_component.yml` is prepared for v0.1.0). Until then there are
+manifest `idf_component.yml` is prepared for v0.9.0). Until then there are
 two ways to use it in your own ESP-IDF project.
 
 **Option A — reference the checkout with EXTRA_COMPONENT_DIRS.** Add the
@@ -314,6 +326,13 @@ A full narrated example of one telegram passing every stage is in
 | `nl.dsmr.4` | NL | auto-selects 4.0 or 4.2 from the version field | 115200 8N1 | required | 10 s |
 | `be.emucs.1.x` | BE | `0-0:96.1.4(50213…50217)` | 115200 8N1 | required | 1 s |
 | `be.emucs.2.1` | BE | `0-0:96.1.4(50221)` | 115200 8N1 | required | 1 s |
+| `hu.dsmr.5.0` | HU | `1-3:0.2.8(50)` | 115200 8N1 | required | 10 s |
+| `se.dsmr.5.0` | SE | `1-3:0.2.8(50)` | 115200 8N1 | required | 1 s |
+| `fi.dsmr.5.0` | FI | `1-3:0.2.8(50)` | 115200 8N1 | required | 1 s |
+| `lt.dsmr.5.0` | LT | `1-3:0.2.8(50)` | 115200 8N1 | required | 1 s |
+| `ie.dsmr.5.0` | IE | `1-3:0.2.8(50)` | 115200 8N1 | required | 1 s |
+| `lu.dsmr.5.0` | LU | `1-3:0.2.8(42)` | 115200 8N1 | required | 10 s |
+| `ch.dsmr.5.0` | CH | `1-3:0.2.8(50)` | 115200 8N1 | required | 10 s |
 
 The transfer interval is informational; the parser accepts whatever timing
 the meter actually delivers, bounded by the configured timeouts. List the
@@ -322,6 +341,36 @@ built-in identifiers at run time with `dsmrProfileListIds()`.
 The field tables (OBIS → datatype, unit, group count) per profile live in
 `src/dsmr_profile.c`; the Belgian tables are initial coverage pending
 verification against the published Fluvius documents (see Status below).
+The European profiles (HU, SE, FI, LT, IE, LU, CH) follow
+`assets/Europese_P1_OBIS_Codes_Overzicht.pdf` — the reference table of
+OBIS objects published on the unencrypted European RJ12 P1 ports for
+NL, BE, HU, SE, FI, LT and IE — plus the national documents for Hungary
+(E.ON Hungária P1 port leaflet 2024-07-02: 115200 8N1, one-way, 10 s
+refresh), Luxembourg (Luxmetering E-Meter P1 Specification 1.1.3: DSMR
+5.0.2 base, reports `42`, 115200 8N1, fixed 10 s period, RJ12 power and
+request pins) and Switzerland (VSE Branchenempfehlung RL-DSP CH 2024,
+Anhang 3: P1 DSMR 5.0.2 is an allowed interface standard with its minimum
+data points, delivery at least every 10 s).
+
+Per-country deviations that are allowed by scope and already reflected in
+the profiles or the UART adapter:
+
+- **Hungary** — 115200 8N1 and a 10 s refresh are printed in the E.ON
+  leaflet. Telegram framing and the reported version are not documented
+  there, so the profile follows the DSMR 5 base it names.
+- **Luxembourg** — the port supplies 5 V and an open-drain data line with
+  idle (MARK) low, inverted relative to the Dutch idle-high P1 signal;
+  set `invertRx` when your interface board does not correct for this. The
+  optional AES-128-GCM envelope (DLMS security suite 0) is a transport
+  concern: the parser accepts the clear-text telegram, which the
+  specification permits by setting the P1 security attribute to 0.
+- **Switzerland** — operation is encrypted or unencrypted per the grid
+  operator, and the standard explicitly allows unencrypted P1 DSMR 5.0.2;
+  encrypted meters need a separate decoder first.
+- **SE / FI / LT / IE** — the overview documents OBIS usage but not the
+  physical layer; the profiles use the DSMR 5 framing defaults until a
+  meter-specific document or fixture proves otherwise.
+
 A meter that does not fit a built-in table can be described with a
 `customProfile` (see [Configuring the parser](#configuring-the-parser)).
 
@@ -333,7 +382,7 @@ fall back to the defaults below.
 
 | Field | Type | Meaning / default when zero or NULL |
 |---|---|---|
-| `countryCode` | `const char *` | Required. `"NL"` or `"BE"`; must match the profile's country, else `DSMR_ERR_COUNTRY_MISMATCH`. |
+| `countryCode` | `const char *` | Required. Two-letter ISO 3166-1 code (`"NL"`, `"BE"`, `"HU"`, `"SE"`, `"FI"`, `"LT"`, `"IE"`, `"LU"`, `"CH"`); must match the profile's country, else `DSMR_ERR_COUNTRY_MISMATCH`. |
 | `profileId` | `const char *` | Required unless `customProfile` is set. Must name a built-in profile, else `DSMR_ERR_UNKNOWN_PROFILE`. |
 | `customProfile` | `const dsmrProfile *` | `NULL` = use `profileId`. Otherwise a full profile description you own; its `profileId`, `countryCode`, `versionObis` and `acceptedVersions` must be non-NULL. |
 | `mbusDevices` / `mbusDeviceCount` | `const dsmrMbusDevice *` / `uint8_t` | Declared M-Bus channels 1–4, at most 4 entries, each channel at most once. `NULL`/0 = no M-Bus devices declared. |
@@ -345,7 +394,7 @@ fall back to the defaults below.
 | `frameTimeoutMs` | `uint32_t` | Maximum frame duration; `0` → 10000 ms. Exceeded → `DSMR_DIAG_TIMEOUT_FRAME`. |
 | `acceptUnknownMinorVersion` | `bool` | `false`. When `true` (and the profile has no auto-select list), an all-digit minor version inside the same family — same digit count, same leading digit as an accepted version — is accepted and the configured table stays in force; the original version is reported. |
 | `acceptLfLineEndings` | `bool` | `false`. When `true`, a bare `LF` closes lines and the trailer instead of strict `CR LF`. |
-| `unknownFieldPolicy` | `dsmrUnknownFieldPolicy` | `DSMR_UNKNOWN_FIELD_SKIP` (0): lines without a table entry are ignored. `DSMR_UNKNOWN_FIELD_RAW`: they are kept as text fields so nothing published is lost. |
+| `unknownFieldPolicy` | `dsmrUnknownFieldPolicy` | `DSMR_UNKNOWN_FIELD_SKIP` (0): lines without a table entry are ignored. `DSMR_UNKNOWN_FIELD_RAW`: they are kept as text fields so nothing published is lost; such fields carry `classification` `DSMR_FIELD_CLASS_UNKNOWN` and never reject the telegram. |
 
 `dsmrParserInit` validates everything before consuming bytes: an unknown
 profile, a country mismatch or insufficient workspace each yield a
@@ -451,7 +500,13 @@ config.mbusDeviceCount = sizeof mbusDevices / sizeof mbusDevices[0];
 - A field like `0-1:24.2.1` arrives with `mbusChannel == 1`; direct
   electricity fields carry `mbusChannel == 0`.
 - A published `0-n:24.1.0` value that contradicts your declaration yields
-  `DSMR_DIAG_MBUS_TYPE_MISMATCH` on an otherwise accepted telegram.
+  `DSMR_DIAG_MBUS_TYPE_MISMATCH` on an otherwise accepted telegram. Two
+  numberings are in use and both are accepted: the Dutch DSMR numbering
+  (1=gas, 2=water, 3=heat, 4=cooling, 5=electricity) and the EN 13757-3
+  M-Bus numbering printed in the European overview and the Luxembourg
+  example (3=gas, 4=heat, 7=water). A value that either numbering
+  explains for your declared type is never a mismatch; only a value that
+  neither explains yields the diagnostic.
 - A channel you did not declare follows the unknown-field policy (skipped
   or kept raw).
 - `dsmrResultFindFieldByObis(result, "0-1:24.2.1", &field)` finds it with
@@ -644,8 +699,10 @@ the text, `FF` → `"FF"`, numbers → fixed-point honoring `scale`.
 ```c
 const char *dsmrStatusToString(dsmrParserStatus status);
 const char *dsmrDiagReasonToString(dsmrDiagReason reason);
+const char *dsmrFieldClassToString(dsmrFieldClass classification);
 ```
-Stable strings for diagnostics and logging.
+Stable strings for diagnostics and logging. `dsmrFieldClassToString()`
+renders a received field as `"known"` or `"unknown"`.
 
 ```c
 const dsmrProfile *dsmrProfileLookup(const char *profileId);
@@ -726,8 +783,16 @@ typedef struct
   const char *unit;        //-- from the profile table, or NULL (text/unknown fields)
   dsmrTimestamp timestamp; //-- valid when hasTimestamp
   bool hasTimestamp;
+  dsmrFieldClass classification; //-- KNOWN or UNKNOWN, see below
 } dsmrTelegramField;
 ```
+
+A field whose OBIS code is not defined by the active profile is classified
+`DSMR_FIELD_CLASS_UNKNOWN`, never a fault. `dsmrFieldClassToString()`
+returns `"known"` or `"unknown"` for logging. This follows the European
+P1 OBIS overview: manufacturers add extra diagnostic objects (notably in
+the `0-0:96.x.x` range), so a universal parser must ignore unknown lines
+or keep them as raw data without rejecting the telegram.
 
 ```c
 typedef struct
@@ -766,7 +831,8 @@ typedef void (*dsmrEventCallback)(const struct dsmrParser_s *parser,
 Other enums: `dsmrMbusDeviceType` (`_GAS, _WATER, _HEAT, _COOLING,
 _ELECTRICITY, _OTHER`), `dsmrFieldType` (`_DECIMAL, _INTEGER, _TEXT,
 _TIMESTAMP, _LOG`), `dsmrCrcPolicy` (`_REQUIRED, _ABSENT, _OPTIONAL`),
-`dsmrUnknownFieldPolicy` (`_SKIP, _RAW`). The `dsmrParser`, `dsmrFraming`
+`dsmrUnknownFieldPolicy` (`_SKIP, _RAW`) and `dsmrFieldClass`
+(`_KNOWN, _UNKNOWN`). The `dsmrParser`, `dsmrFraming`
 and `dsmrFieldDefinition`/`dsmrFieldBlock`/`dsmrProfile` structures are
 documented above; the internals of `dsmrParser`/`dsmrFraming` must not be
 touched by the application.
@@ -881,7 +947,9 @@ make run
 
 The host build compiles the portable core as C11 without ESP-IDF, with
 address and undefined behaviour sanitizers, and exercises the acceptance
-list of projectPrompt.md section 7.
+list of projectPrompt.md section 7. The current run and the complete
+catalogue of test telegrams are recorded in
+[testResults.md](testResults.md).
 
 ## Telegram fixtures
 
@@ -895,9 +963,16 @@ make fixtures
 
 `test/fixtures/tools/generate_fixtures.py` computes every trailer CRC with
 an independent CRC-16/ARC implementation. Source and revision are recorded
-with each fixture. The Belgian fixtures are structured after the eMUCs
-object tables and are marked pending verification against the published
-Fluvius documents.
+with each fixture. The set holds at least one accepted and one rejected
+telegram for every built-in profile and therefore for every supported
+country code: NL (4.0, 4.2, 5.0 and the automatic `nl.dsmr.4`), BE
+(eMUCs 1.x and 2.1) and HU, SE, FI, LT, IE, LU and CH in single-phase
+and three-phase variants. The Luxembourg set includes the clear-text
+example telegram of the Luxmetering specification (Appendix A) and its
+padding timestamps as a negative case. The Belgian fixtures are
+structured after the eMUCs object tables and are marked pending
+verification against the published Fluvius documents. Every result is
+listed in [testResults.md](testResults.md).
 
 ## Hardware note
 
@@ -945,17 +1020,38 @@ parserDSMR/
 
 ## Status and pending work
 
-- Full OBIS inventory per profile: the first-release field tables cover the
-  objects required by projectPrompt.md section 5; the Belgian tables are
-  initial coverage pending the verified inventory (see table comments in
-  `src/dsmr_profile.c`).
-- Luxembourg, Sweden, Finland and Norway need separate transport decoders
-  and verified profiles before being listed.
+- Full OBIS inventory per profile: the Dutch and Belgian field tables cover
+  the objects required by projectPrompt.md section 5 (the Belgian tables are
+  initial coverage pending the verified inventory); the European tables for
+  HU, SE, FI, LT, IE, LU and CH follow
+  `assets/Europese_P1_OBIS_Codes_Overzicht.pdf` and the national documents.
+  Every profile now has synthetic positive and negative fixtures
+  ([testResults.md](testResults.md)); real telegrams are still pending for
+  the new countries — please report meter-specific deviations so the tables
+  and the compatibility matrix can be verified. Known open objects: the
+  Hungarian end-of-month register `0-0:98.1.0` is listed by the E.ON
+  leaflet but its record layout is not documented, so the parser leaves it
+  as unknown data (skipped by default, never a fault); the Hungarian and
+  Luxembourg documents print the objects in COSEM capture-object form
+  (`.255` suffix), and a meter that publishes those keys verbatim on the
+  wire is likewise tolerated as unknown data; phase voltages follow the
+  overview codes `32/52/72.7.0`, so a Dutch DSMR 5 meter that reports
+  `32.8.0` has those lines skipped as unknown until the code is verified
+  against the published companion standard.
+- Luxembourg (Luxmetering 1.1.3) and Switzerland (VSE RL-DSP CH 2024
+  Anhang 3) both allow clear-text operation; the parser accepts the
+  plaintext telegram. Meters whose operator enabled the AES-128-GCM
+  envelope need a separate transport decoder in front of the parser. The
+  Austrian Oesterreichs Energie Smart Meter 2.0 main document names the H1
+  customer interface "DSMR P1, 115 kbaud" but neither the telegram format
+  nor the encryption policy — those details are in annexes that are not
+  part of `assets/`, so Austria has no built-in profile yet. Norway's
+  wired M-Bus HAN over RJ45 needs a separate decoder as well.
 - The Arduino packaging (`library.properties`, examples) follows the
   ESP-IDF release; `src/` is already the Arduino source directory and the
   public header provides C linkage.
 - Publishing to the ESP Component Registry is pending (manifest prepared,
-  v0.1.0).
+  v0.9.0).
 
 ## License
 

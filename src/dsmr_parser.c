@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_parser.c - public API, framing glue and event dispatch
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 3
 //--
 //-- The parser owns no memory of its own. The workspace is carved into the
 //-- telegram buffer, the field array, and the deep copies of the M-Bus
@@ -19,6 +19,11 @@
 
 #include <stdio.h>
 #include <string.h>
+
+//-- Library version. Kept in exactly one place; the version travels with the
+//-- source file headers (Date/Build) and with idf_component.yml. Callers read
+//-- it through dsmrParserVersion().
+const char *PROG_VERSION = "v0.9.0";
 
 //-- --------------------------------------------------------------------------
 //-- Small helpers
@@ -732,4 +737,19 @@ const char *dsmrDiagReasonToString(dsmrDiagReason reason)
     case DSMR_DIAG_INVALID_TIMESTAMP: return "invalid timestamp";
     default: return "unknown reason";
   }
+}
+
+const char *dsmrFieldClassToString(dsmrFieldClass classification)
+{
+  switch (classification)
+  {
+    case DSMR_FIELD_CLASS_KNOWN: return "known";
+    case DSMR_FIELD_CLASS_UNKNOWN: return "unknown";
+    default: return "unknown classification";
+  }
+}
+
+const char *dsmrParserVersion(void)
+{
+  return PROG_VERSION;
 }

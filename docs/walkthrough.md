@@ -1,6 +1,6 @@
 # One telegram through the parser
 
-**Date:** 2026-11-14 · **Build:** 1
+**Date:** 2026-11-16 · **Build:** 4
 
 This walkthrough follows the fixture `F1 nl.dsmr.4.2 single-phase` from UART
 bytes to the result callback. It is the reading path from UART bytes to the
@@ -55,7 +55,12 @@ The decoder validates the strict ASCII structure: the identification line
 (becoming the meter identification), the blank line, then one data line per
 CR LF. Each line is split into the OBIS key and its ordered parenthesized
 groups. The OBIS key is resolved against the profile field blocks; `?`
-matches the M-Bus channel digit (`0-?:24.1.0`).
+matches the M-Bus channel digit (`0-?:24.1.0`). A code the profile does
+not define is never a fault: it follows the unknown-field policy (skipped
+by default, or kept as raw text with `classification`
+`DSMR_FIELD_CLASS_UNKNOWN`), because European meters add manufacturer
+objects — notably in the `0-0:96.x.x` range — that a universal parser
+must tolerate.
 
 Values are converted in `src/dsmr_value.c` without locale dependence:
 decimals keep an integer mantissa and a scale so the published precision and
@@ -70,9 +75,14 @@ M-Bus readings carry the channel in the OBIS code (`0-1:24.2.1` has channel
 1). The channel must be declared in the configuration device table; a
 published `0-n:24.1.0` value that contradicts the declared type produces a
 `DSMR_DIAG_MBUS_TYPE_MISMATCH` diagnostic alongside the accepted result,
-and an undeclared channel follows the unknown-field policy. Every accepted
-field is resolved against the application label table; fields without a
-label remain reachable through `dsmrResultFindFieldByObis`.
+and an undeclared channel follows the unknown-field policy. Two device
+numberings are accepted for `0-n:24.1.0`: the Dutch DSMR numbering
+(1=gas, 2=water, 3=heat) and the EN 13757-3 numbering documented in the
+European P1 OBIS overview and the Luxembourg example (3=gas, 4=heat,
+7=water); only a value that neither numbering explains contradicts the
+declaration. Every accepted field is resolved against the application
+label table; fields without a label remain reachable through
+`dsmrResultFindFieldByObis`.
 
 ## 7. The result callback
 

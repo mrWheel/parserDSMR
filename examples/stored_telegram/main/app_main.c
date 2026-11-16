@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: examples/stored_telegram/main/app_main.c
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 3
 //--
 //-- Stored telegram test program. It runs from the USB console with no P1
 //-- wiring: every fixture of the host test set is embedded and fed to the
@@ -61,13 +61,17 @@ static void printFields(const dsmrTelegramResult *result)
       continue;
     }
 
+    //-- Fields the profile does not define show a question mark instead of
+    //-- a label. Unknown codes are data, never a fault.
+    const char *name = (field->name != NULL) ? field->name : ((field->classification == DSMR_FIELD_CLASS_UNKNOWN) ? "?" : "-");
+
     if (field->mbusChannel != 0u)
     {
-      printf("  ch%u %-12s %-24s = %s %s\r\n", (unsigned)field->mbusChannel, field->obis, (field->name != NULL) ? field->name : "-", value, (field->unit != NULL) ? field->unit : "");
+      printf("  ch%u %-12s %-24s = %s %s\r\n", (unsigned)field->mbusChannel, field->obis, name, value, (field->unit != NULL) ? field->unit : "");
     }
     else
     {
-      printf("  %-12s %-24s = %s %s\r\n", field->obis, (field->name != NULL) ? field->name : "-", value, (field->unit != NULL) ? field->unit : "");
+      printf("  %-12s %-24s = %s %s\r\n", field->obis, name, value, (field->unit != NULL) ? field->unit : "");
     }
   }
 }

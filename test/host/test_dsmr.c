@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: test/host/test_dsmr.c - host tests for the portable C11 core
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 4
 //--
 //-- Compiles the portable core without ESP-IDF. Run with: make run
 //-- Coverage follows the acceptance list of projectPrompt.md section 7.
@@ -219,6 +219,13 @@ static void testCrcCheckValue(void)
   CHECK(crc == 0xBB3D, "CRC-16/ARC check value for 123456789 is 0xBB3D");
 }
 
+static void testVersionString(void)
+{
+  //-- The getter must hand out the parser's own version without allocation.
+  CHECK(dsmrParserVersion() != NULL, "dsmrParserVersion never NULL");
+  CHECK(strcmp(dsmrParserVersion(), "v0.9.0") == 0, "dsmrParserVersion reports v0.9.0");
+}
+
 static void testSampleTelegram(void)
 {
   dsmrParser parser;
@@ -324,7 +331,14 @@ static void testAcceptedFixtures(void)
     CHECK(collector.result.fieldCount > 0, "accepted frame yields fields");
     CHECK(collector.result.crcStatus == DSMR_CRC_STATUS_VERIFIED, "accepted frame reports verified CRC");
     CHECK(collector.result.meterIdentification != NULL, "meter identification present");
-    CHECK(strcmp(collector.result.profileId, fixture->profileId) == 0, "profile id reported in result");
+
+    //-- The automatic nl.dsmr.4 profile reports the concrete 4.0 or 4.2
+    //-- profile resolved from the reported version; every other profile
+    //-- reports itself.
+    bool resolvedIdOk = (strcmp(collector.result.profileId, fixture->profileId) == 0) ||
+                        ((strcmp(fixture->profileId, "nl.dsmr.4") == 0) &&
+                         ((strcmp(collector.result.profileId, "nl.dsmr.4.0") == 0) || (strcmp(collector.result.profileId, "nl.dsmr.4.2") == 0)));
+    CHECK(resolvedIdOk, "profile id reported in result");
     CHECK(collector.result.reportedVersion != NULL, "reported version present");
 
     //-- The raw view must be the accepted frame byte for byte, including
@@ -905,6 +919,269 @@ static void testUnknownFieldPolicy(void)
 
   const dsmrTelegramField *raw = findLocalField(&collector, "9-9:99.99.9");
   CHECK(collector.telegramCount == 1 && raw != NULL && raw->value.kind == DSMR_VALUE_TEXT, "unknown field exposed as bounded raw data");
+  CHECK((raw != NULL) && (raw->classification == DSMR_FIELD_CLASS_UNKNOWN), "raw field is classified unknown, not a fault");
+
+  const dsmrTelegramField *known = findLocalField(&collector, "1-0:1.8.1");
+  CHECK((known != NULL) && (known->classification == DSMR_FIELD_CLASS_KNOWN), "profile field is classified known");
+
+  //-- A malformed line of an unknown code must never reject the telegram.
+  config.unknownFieldPolicy = DSMR_UNKNOWN_FIELD_SKIP;
+  length = buildFrame(frame, sizeof frame,
+                      "/TEST\r\n\r\n"
+                      "1-3:0.2.8(42)\n"
+                      "1-0:1.8.1(000001.000*kWh)\n"
+                      "9-9:99.99.8\n"
+                      "9-9:99.99.7(1.0*kWh)trailing\n");
+
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init skip policy for malformed unknown lines");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 3000, 0);
+  CHECK(collector.telegramCount == 1 && collector.diagnosticCount == 0, "malformed unknown lines never reject the telegram");
+
+  //-- A malformed line of a known code is still a syntax error.
+  length = buildFrame(frame, sizeof frame,
+                      "/TEST\r\n\r\n"
+                      "1-3:0.2.8(42)\n"
+                      "1-0:1.8.1(000001.000*kWh)\n"
+                      "0-0:96.1.1\n");
+
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for malformed known line");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 4000, 0);
+  CHECK(collector.telegramCount == 0 && collector.lastDiag == DSMR_DIAG_SYNTAX_ERROR, "malformed known line yields syntax error");
+}
+
+//-- The European DSMR-style profiles initialise for their own country and
+//-- reject a mismatched country code.
+static void testEuropeanProfiles(void)
+{
+  static const char *const ids[] =
+  {
+    "hu.dsmr.5.0", "se.dsmr.5.0", "fi.dsmr.5.0", "lt.dsmr.5.0",
+    "ie.dsmr.5.0", "lu.dsmr.5.0", "ch.dsmr.5.0",
+  };
+  static const char *const countries[] =
+  {
+    "HU", "SE", "FI", "LT", "IE", "LU", "CH",
+  };
+
+  for (size_t index = 0; index < (sizeof ids / sizeof ids[0]); index++)
+  {
+    dsmrParser parser;
+    dsmrParserConfig config;
+    char label[64];
+
+    memset(&config, 0, sizeof config);
+    config.countryCode = countries[index];
+    config.profileId = ids[index];
+
+    snprintf(label, sizeof label, "%s initialises", ids[index]);
+    CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, label);
+
+    config.countryCode = "NL";
+    CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_ERR_COUNTRY_MISMATCH, "european profile rejects wrong country");
+  }
+
+  const char *const *list = dsmrProfileListIds();
+  uint16_t count = 0u;
+
+  while (list[count] != NULL)
+  {
+    count++;
+  }
+
+  CHECK(count == 13, "profile list exposes thirteen built-in identifiers");
+}
+
+//-- The acceptance list of projectPrompt.md section 7 requires that every
+//-- profile is exercised. Every built-in identifier must have at least one
+//-- accepted fixture, so every supported country code is present in the
+//-- shared fixture set that also drives the stored telegram test program.
+static void testProfileFixtureCoverage(void)
+{
+  const char *const *list = dsmrProfileListIds();
+
+  for (size_t index = 0; list[index] != NULL; index++)
+  {
+    bool covered = false;
+    char label[64];
+
+    for (uint16_t fixture = 0u; fixture < DSMR_FIXTURE_COUNT; fixture++)
+    {
+      if (dsmrFixtures[fixture].expectAccepted && (strcmp(dsmrFixtures[fixture].profileId, list[index]) == 0))
+      {
+        covered = true;
+        break;
+      }
+    }
+
+    snprintf(label, sizeof label, "accepted fixture exists for %s", list[index]);
+    CHECK(covered, label);
+  }
+}
+
+//-- A Hungarian style telegram: DSMR 5.0 version object, Hungarian-only
+//-- objects decode with their units, and manufacturer extras remain unknown
+//-- data instead of a fault. Luxembourg reports 42 on a 5.0.2 base.
+static void testHungarianAndLuxembourgTelegrams(void)
+{
+  dsmrParser parser;
+  Collector collector;
+  dsmrParserConfig config;
+  char frame[2048];
+
+  memset(&config, 0, sizeof config);
+  config.countryCode = "HU";
+  config.profileId = "hu.dsmr.5.0";
+  config.unknownFieldPolicy = DSMR_UNKNOWN_FIELD_RAW;
+
+  size_t length = buildFrame(frame, sizeof frame,
+                             "/EON5\r\n\r\n"
+                             "1-3:0.2.8(50)\r\n"
+                             "0-0:1.0.0(251116104500S)\r\n"
+                             "0-0:96.1.0(ABCD1234)\r\n"
+                             "0-0:96.14.0(1)\r\n"
+                             "1-0:1.8.0(000123.456*kWh)\r\n"
+                             "1-0:15.8.0(000456.789*kWh)\r\n"
+                             "1-0:14.7.0(50.01*Hz)\r\n"
+                             "1-0:13.7.0(0.98)\r\n"
+                             "1-0:5.8.0(000001.000*kVArh)\r\n"
+                             "1-0:91.7.0(0.123*A)\r\n"
+                             "0-0:96.1.1(00456CDE)\r\n"
+                             "0-0:96.5.0(0000FFFF)\r\n"
+                             "0-0:97.97.0(0000)\r\n");
+
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init Hungarian profile");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 1000, 0);
+  CHECK(collector.telegramCount == 1 && collector.diagnosticCount == 0, "accept Hungarian telegram");
+  CHECK(findLocalField(&collector, "1-0:15.8.0") != NULL, "Hungarian total active energy decodes");
+  CHECK(findLocalField(&collector, "1-0:14.7.0") != NULL, "Hungarian frequency decodes");
+  CHECK(findLocalField(&collector, "1-0:91.7.0") != NULL, "Hungarian neutral current decodes");
+  CHECK(findLocalField(&collector, "0-0:96.5.0") != NULL, "Hungarian status word decodes as text");
+
+  //-- A manufacturer object outside the table stays accepted raw data.
+  length = buildFrame(frame, sizeof frame,
+                      "/EON5\r\n\r\n"
+                      "1-3:0.2.8(50)\r\n"
+                      "1-0:1.8.0(000001.000*kWh)\r\n"
+                      "0-0:96.7.22(3)\r\n");
+
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 2000, 0);
+  CHECK(collector.telegramCount == 1 && collector.diagnosticCount == 0, "unknown Hungarian object never rejects");
+  const dsmrTelegramField *extra = findLocalField(&collector, "0-0:96.7.22");
+  CHECK((extra != NULL) && (extra->classification == DSMR_FIELD_CLASS_UNKNOWN), "manufacturer extra classified unknown");
+
+  //-- Luxembourg reports 42 on the DSMR 5.0.2 base per the Luxmetering
+  //-- example telegram.
+  static const dsmrMbusDevice luDevices[] =
+  {
+    { .channel = 1, .deviceType = DSMR_MBUS_DEVICE_HEAT },
+  };
+
+  memset(&config, 0, sizeof config);
+  config.countryCode = "LU";
+  config.profileId = "lu.dsmr.5.0";
+  config.mbusDevices = luDevices;
+  config.mbusDeviceCount = 1;
+
+  length = buildFrame(frame, sizeof frame,
+                      "/Lux5M\r\n\r\n"
+                      "1-3:0.2.8(42)\r\n"
+                      "0-0:1.0.0(251116104500S)\r\n"
+                      "0-0:42.0.0(5341473130333037)\r\n"
+                      "0-0:96.1.0(464C463138393930)\r\n"
+                      "1-0:1.8.0(001234.567*kWh)\r\n"
+                      "1-0:1.7.0(001.234*kW)\r\n"
+                      "1-0:9.7.0(001.234*kVA)\r\n"
+                      "0-0:17.0.0(99.9*kVA)\r\n"
+                      "0-0:96.3.10(1)\r\n"
+                      "0-1:24.1.0(003)\r\n"
+                      "0-1:24.2.1(251116104500S)(00012.345*m3)\r\n"
+                      "0-1:24.4.0(0)\r\n");
+
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init Luxembourg profile");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 3000, 0);
+  CHECK(collector.telegramCount == 1 && collector.diagnosticCount == 0, "accept Luxembourg telegram reporting 42");
+  CHECK(findLocalField(&collector, "1-0:9.7.0") != NULL, "Luxembourg apparent power decodes");
+  CHECK(findLocalField(&collector, "0-0:17.0.0") != NULL, "Luxembourg SMAX threshold decodes");
+
+  const dsmrTelegramField *mbus = findLocalField(&collector, "0-1:24.2.1");
+  CHECK((mbus != NULL) && mbus->hasTimestamp, "Luxembourg M-Bus timestamp plus value decodes");
+}
+
+//-- Two device numberings are documented for 0-n:24.1.0. The Dutch DSMR
+//-- numbering is 1=gas, 2=water, 3=heat; the European P1 OBIS overview and
+//-- the Luxembourg example telegram use the EN 13757-3 numbering 3=gas,
+//-- 4=heat, 7=water. A value that any numbering explains for the declared
+//-- type must not produce the mismatch diagnostic; only a value that no
+//-- numbering explains may.
+static void testMbusDeviceNumberings(void)
+{
+  dsmrParser parser;
+  Collector collector;
+  dsmrParserConfig config;
+  char frame[2048];
+  size_t length;
+
+  static const dsmrMbusDevice gasDevices[] = { { .channel = 1, .deviceType = DSMR_MBUS_DEVICE_GAS } };
+  static const dsmrMbusDevice waterDevices[] = { { .channel = 1, .deviceType = DSMR_MBUS_DEVICE_WATER } };
+  static const dsmrMbusDevice heatDevices[] = { { .channel = 1, .deviceType = DSMR_MBUS_DEVICE_HEAT } };
+
+  memset(&config, 0, sizeof config);
+  config.countryCode = "HU";
+  config.profileId = "hu.dsmr.5.0";
+  config.mbusDevices = gasDevices;
+  config.mbusDeviceCount = 1;
+
+  length = buildFrame(frame, sizeof frame,
+                      "/EON5\r\n\r\n"
+                      "1-3:0.2.8(50)\r\n"
+                      "0-1:24.1.0(003)\r\n");
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for gas on EN 3");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 1000, 0);
+  CHECK((collector.telegramCount == 1) && (collector.typeMismatchCount == 0), "gas declared against EN 13757-3 value 3");
+
+  config.mbusDevices = heatDevices;
+  length = buildFrame(frame, sizeof frame,
+                      "/EON5\r\n\r\n"
+                      "1-3:0.2.8(50)\r\n"
+                      "0-1:24.1.0(004)\r\n");
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for heat on EN 4");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 2000, 0);
+  CHECK((collector.telegramCount == 1) && (collector.typeMismatchCount == 0), "heat declared against EN 13757-3 value 4");
+
+  config.mbusDevices = waterDevices;
+  length = buildFrame(frame, sizeof frame,
+                      "/EON5\r\n\r\n"
+                      "1-3:0.2.8(50)\r\n"
+                      "0-1:24.1.0(007)\r\n");
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for water on EN 7");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 3000, 0);
+  CHECK((collector.telegramCount == 1) && (collector.typeMismatchCount == 0), "water declared against EN 13757-3 value 7");
+
+  length = buildFrame(frame, sizeof frame,
+                      "/EON5\r\n\r\n"
+                      "1-3:0.2.8(50)\r\n"
+                      "0-1:24.1.0(002)\r\n");
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for water on DSMR 2");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 4000, 0);
+  CHECK((collector.telegramCount == 1) && (collector.typeMismatchCount == 0), "water declared against DSMR value 2");
+
+  length = buildFrame(frame, sizeof frame,
+                      "/EON5\r\n\r\n"
+                      "1-3:0.2.8(50)\r\n"
+                      "0-1:24.1.0(009)\r\n");
+  CHECK(dsmrParserInit(&parser, &config, workspace, sizeof workspace) == DSMR_OK, "init for unexplained value");
+  collectorReset(&collector);
+  feedAll(&parser, &collector, frame, length, 5000, 0);
+  CHECK((collector.telegramCount == 1) && (collector.typeMismatchCount == 1), "value no numbering explains yields mismatch on an accepted telegram");
 }
 
 //-- --------------------------------------------------------------------------
@@ -914,6 +1191,7 @@ static void testUnknownFieldPolicy(void)
 int main(void)
 {
   testCrcCheckValue();
+  testVersionString();
   testSampleTelegram();
   testInitErrors();
   testAcceptedFixtures();
@@ -934,6 +1212,10 @@ int main(void)
   testReentrancyGuard();
   testCustomProfileAddsField();
   testUnknownFieldPolicy();
+  testEuropeanProfiles();
+  testProfileFixtureCoverage();
+  testHungarianAndLuxembourgTelegrams();
+  testMbusDeviceNumberings();
 
   printf("%d checks, %d failures\n", checks, failures);
   return (failures == 0) ? 0 : 1;

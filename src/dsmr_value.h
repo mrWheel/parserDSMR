@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_value.h - value and timestamp conversion of the core
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //--
 //-- Decimal values are converted without locale-dependent parsing. The
 //-- mantissa and scale preserve the published precision and allow overflow

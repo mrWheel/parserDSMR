@@ -1,5 +1,5 @@
 # parserDSMR - host tests for the portable C11 core
-# Date: 2026-11-14 · Build: 1
+# Date: 2026-11-16 · Build: 2
 
 CC ?= cc
 CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Werror -g -fsanitize=address,undefined

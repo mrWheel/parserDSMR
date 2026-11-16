@@ -1,11 +1,11 @@
 ## parserDSMR - manifest for the ESP Component Registry
-## Date: 2026-11-14 · Build: 1
+## Date: 2026-11-16 · Build: 2
 ##
 ## The repository field must point at the public repository before the
 ## component is published.
 
-version: "0.1.0"
-description: "Portable C11 DSMR/P1 smart-meter telegram parser with an ESP-IDF UART adapter, supporting Dutch DSMR 4.0/4.2/5.0 and Belgian eMUCs profiles"
+version: "0.9.0"
+description: "Portable C11 DSMR/P1 smart-meter telegram parser with an ESP-IDF UART adapter, supporting Dutch DSMR 4.0/4.2/5.0, Belgian eMUCs and the documented European P1 OBIS profiles"
 url: "https://github.com/mrWheel/parserDSMR"
 repository: "https://github.com/mrWheel/parserDSMR"
 documentation: "https://github.com/mrWheel/parserDSMR/blob/main/README.md"

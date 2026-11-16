@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_crc.h - CRC-16/ARC used by the P1 telegram trailer
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //--
 //-- The CRC covers the original byte sequence from '/' through '!' inclusive,
 //-- including the intervening CR LF bytes. The parameters are initial value

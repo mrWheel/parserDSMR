@@ -1,3 +1,14 @@
+//-- ==========================================================================
+//-- parserDSMR - DSMR/P1 telegram parser
+//-- File: main/app_main.c - built-in test telegram replay demo
+//-- Date: 2026-11-16 · Build: 1
+//--
+//-- Default application of the repository. It replays the built-in sample
+//-- telegram through the parser from the USB console, without any P1 wiring,
+//-- and logs the component version, one line per summary item and one line
+//-- per decoded field.
+//-- ==========================================================================
+
 #include <string.h>
 
 #include "esp_log.h"
@@ -25,12 +36,12 @@ static void onEvent(const dsmrParser *parserInstance, const dsmrParserEvent *eve
   {
     const dsmrTelegramResult *result = event->result;
 
-    ESP_LOGI(TAG, "Accepted telegram: profile=%s version=%s meter=%s crc=%s fields=%u",
-             result->profileId,
-             (result->reportedVersion != NULL) ? result->reportedVersion : "-",
-             (result->meterIdentification != NULL) ? result->meterIdentification : "-",
-             (result->crcStatus == DSMR_CRC_STATUS_VERIFIED) ? "verified" : "absent",
-             (unsigned)result->fieldCount);
+    ESP_LOGI(TAG, "Accepted telegram:");
+    ESP_LOGI(TAG, "  profile = %s", result->profileId);
+    ESP_LOGI(TAG, "  version = %s", (result->reportedVersion != NULL) ? result->reportedVersion : "-");
+    ESP_LOGI(TAG, "  meter   = %s", (result->meterIdentification != NULL) ? result->meterIdentification : "-");
+    ESP_LOGI(TAG, "  crc     = %s", (result->crcStatus == DSMR_CRC_STATUS_VERIFIED) ? "verified" : "absent");
+    ESP_LOGI(TAG, "  fields  = %u", (unsigned)result->fieldCount);
 
     for (uint16_t index = 0; index < result->fieldCount; index++)
     {
@@ -78,6 +89,9 @@ static void onEvent(const dsmrParser *parserInstance, const dsmrParserEvent *eve
 
 void app_main(void)
 {
+  //-- Version of the parser component as reported by the component itself.
+  ESP_LOGI(TAG, "Component parserDSMR version [%s]", dsmrParserVersion());
+
   const dsmrParserConfig config =
   {
     .countryCode = "NL",

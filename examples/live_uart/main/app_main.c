@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: examples/live_uart/main/app_main.c
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 3
 //--
 //-- Live UART test program. It does nothing other than wait for telegrams
 //-- on the P1 port UART and display the parsed data. For each accepted
@@ -62,13 +62,17 @@ static void onEvent(const dsmrParser *parserInstance, const dsmrParserEvent *eve
 
       dsmrFormatValue(&field->value, valueText, sizeof valueText);
 
+      //-- Unknown OBIS codes are kept as raw data and flagged as unknown;
+      //-- they are never reported as a fault.
+      const char *classMark = (field->classification == DSMR_FIELD_CLASS_UNKNOWN) ? " (unknown)" : "";
+
       if (field->mbusChannel != 0u)
       {
-        printf("ch%u %-12s %s %s\r\n", (unsigned)field->mbusChannel, field->obis, valueText, (field->unit != NULL) ? field->unit : "");
+        printf("ch%u %-12s %s %s%s\r\n", (unsigned)field->mbusChannel, field->obis, valueText, (field->unit != NULL) ? field->unit : "", classMark);
       }
       else
       {
-        printf("    %-12s %s %s\r\n", field->obis, valueText, (field->unit != NULL) ? field->unit : "");
+        printf("    %-12s %s %s%s\r\n", field->obis, valueText, (field->unit != NULL) ? field->unit : "", classMark);
       }
     }
 

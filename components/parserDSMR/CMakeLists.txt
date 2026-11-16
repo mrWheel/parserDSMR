@@ -1,5 +1,5 @@
 # parserDSMR - ESP-IDF component
-# Date: 2026-11-14 · Build: 1
+# Date: 2026-11-16 · Build: 2
 
 set(dsmr_sources
   "src/dsmr_crc.c"

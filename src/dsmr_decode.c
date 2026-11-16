@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_decode.c - OBIS line decoding of a stored candidate
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 4
 //-- ==========================================================================
 
 #include "dsmr_decode.h"
@@ -92,44 +92,48 @@ static const dsmrMbusDevice *findDeclaredDevice(const dsmrParserConfig *config, 
   return NULL;
 }
 
-//-- Maps the published 0-n:24.1.0 device value to the declared device type.
-static bool deviceTypeFromPublishedValue(int64_t published, dsmrMbusDeviceType *type)
+//-- True when a published 0-n:24.1.0 value is compatible with a declared
+//-- device type. Two numberings are in use on the supported P1 ports. The
+//-- Dutch and Belgian DSMR/eMUCS numbering is 1=gas, 2=water, 3=heat,
+//-- 4=cooling, 5=electricity. The European P1 OBIS overview documents the
+//-- EN 13757-3 M-Bus numbering for the same object (3=gas, 4=heat, 7=water
+//-- in assets/Europese_P1_OBIS_Codes_Overzicht.pdf) and the Luxembourg
+//-- E-Meter P1 Specification 1.1.3 example telegram publishes 3 for a gas
+//-- channel and 7 for a water channel. Because the numberings overlap, a
+//-- value that any numbering explains for the declared type is accepted;
+//-- only a value that no numbering explains yields the mismatch
+//-- diagnostic. Ambiguous values therefore never produce a false alarm.
+static bool publishedValueMatchesDeviceType(int64_t published, dsmrMbusDeviceType declared)
 {
-  switch (published)
+  switch (declared)
   {
-    case 1:
+    case DSMR_MBUS_DEVICE_GAS:
     {
-      *type = DSMR_MBUS_DEVICE_GAS;
-      return true;
+      return (published == 1) || (published == 3);
     }
 
-    case 2:
+    case DSMR_MBUS_DEVICE_WATER:
     {
-      *type = DSMR_MBUS_DEVICE_WATER;
-      return true;
+      return (published == 2) || (published == 7);
     }
 
-    case 3:
+    case DSMR_MBUS_DEVICE_HEAT:
     {
-      *type = DSMR_MBUS_DEVICE_HEAT;
-      return true;
+      return (published == 3) || (published == 4);
     }
 
-    case 4:
+    case DSMR_MBUS_DEVICE_COOLING:
     {
-      *type = DSMR_MBUS_DEVICE_COOLING;
-      return true;
+      return (published == 4);
     }
 
-    case 5:
+    case DSMR_MBUS_DEVICE_ELECTRICITY:
     {
-      *type = DSMR_MBUS_DEVICE_ELECTRICITY;
-      return true;
+      return (published == 5);
     }
 
     default:
     {
-      *type = DSMR_MBUS_DEVICE_OTHER;
       return false;
     }
   }
@@ -200,34 +204,46 @@ static int readLine(DecodeContext *ctx, size_t *position, char **line, size_t *l
 }
 
 //-- Splits a data line into its OBIS code and its ordered parenthesized
-//-- groups. Returns the number of groups, or -1 on a syntax error.
+//-- groups. Returns the number of groups, or -1 on a syntax error. On a
+//-- syntax error the OBIS code is still reported when the key itself is
+//-- well formed, so the caller can apply the unknown-field policy to a
+//-- malformed line of a code the profile does not define. An unknown line
+//-- shall never reject the telegram by itself.
 static int splitLine(char *line, const char **obis, char **groups, uint8_t groupCapacity)
 {
   size_t index = 0;
 
-  while ((line[index] != '\0') && (line[index] != '('))
+  while (line[index] != '\0')
   {
     char character = line[index];
     bool allowed = ((character >= '0') && (character <= '9')) || (character == '-') || (character == ':') || (character == '.');
 
     if (!allowed)
     {
-      return -1;
+      break;
     }
 
     index++;
   }
 
-  if (line[index] != '(')
+  if (index == 0u)
   {
     return -1;
   }
 
-  //-- The '(' at index is simultaneously the terminator of the OBIS code
-  //-- and the opening delimiter of the first value group. It is consumed
-  //-- here; the groups loop below expects '(' only between groups.
+  //-- The character at index is simultaneously the terminator of the OBIS
+  //-- code and, when it is '(', the opening delimiter of the first value
+  //-- group. It is consumed here; the groups loop below expects '(' only
+  //-- between groups.
+  char stoppedAt = line[index];
   line[index] = '\0';
   *obis = line;
+
+  if (stoppedAt != '(')
+  {
+    return -1;
+  }
+
   index++;
 
   uint8_t groupCount = 0;
@@ -274,7 +290,7 @@ static int splitLine(char *line, const char **obis, char **groups, uint8_t group
 
 //-- Adds a field to the ordered result array. Returns false when the array
 //-- is full.
-static bool addField(DecodeContext *ctx, const char *obis, uint8_t channel, const dsmrValue *value, const char *unit, const dsmrTimestamp *timestamp)
+static bool addField(DecodeContext *ctx, const char *obis, uint8_t channel, const dsmrValue *value, const char *unit, const dsmrTimestamp *timestamp, dsmrFieldClass classification)
 {
   if (ctx->output->fieldCount >= ctx->input->fieldCapacity)
   {
@@ -289,6 +305,7 @@ static bool addField(DecodeContext *ctx, const char *obis, uint8_t channel, cons
   field->name = resolveLabel(ctx->input->config, obis);
   field->value = *value;
   field->unit = unit;
+  field->classification = classification;
 
   if (timestamp != NULL)
   {
@@ -319,6 +336,28 @@ static bool isDuplicate(DecodeContext *ctx, const char *obis, uint8_t channel, b
   return false;
 }
 
+//-- Applies the unknown-field policy to a line whose OBIS code the active
+//-- profile does not define. Unknown fields are never a fault: they are
+//-- skipped or kept as bounded raw text and classified as unknown.
+static bool addUnknownField(DecodeContext *ctx, const char *obis, uint8_t channel, const char *text, size_t linePosition)
+{
+  if (ctx->input->config->unknownFieldPolicy == DSMR_UNKNOWN_FIELD_SKIP)
+  {
+    return true;
+  }
+
+  dsmrValue value;
+  dsmrValueSetText(&value, (text != NULL) ? text : "");
+
+  if (!addField(ctx, obis, channel, &value, NULL, NULL, DSMR_FIELD_CLASS_UNKNOWN))
+  {
+    rejectWith(ctx, DSMR_DIAG_SIZE_LIMIT, obis, linePosition);
+    return false;
+  }
+
+  return true;
+}
+
 //-- Decodes one data line against the resolved profile.
 static bool decodeLine(DecodeContext *ctx, char *line, size_t lineLength, size_t linePosition)
 {
@@ -328,7 +367,15 @@ static bool decodeLine(DecodeContext *ctx, char *line, size_t lineLength, size_t
 
   if (groupCount < 0)
   {
-    rejectWith(ctx, DSMR_DIAG_SYNTAX_ERROR, NULL, linePosition);
+    //-- A well-formed OBIS key the profile does not define never rejects the
+    //-- telegram; it follows the unknown-field policy. Only a known code or
+    //-- a key that is not an OBIS code at all yields a syntax error.
+    if ((obis != NULL) && (dsmrProfileFindField(ctx->profile, obis) == NULL))
+    {
+      return addUnknownField(ctx, obis, channelFromObis(obis), NULL, linePosition);
+    }
+
+    rejectWith(ctx, DSMR_DIAG_SYNTAX_ERROR, obis, linePosition);
     return false;
   }
 
@@ -350,21 +397,7 @@ static bool decodeLine(DecodeContext *ctx, char *line, size_t lineLength, size_t
 
   if (definition == NULL)
   {
-    if (ctx->input->config->unknownFieldPolicy == DSMR_UNKNOWN_FIELD_SKIP)
-    {
-      return true;
-    }
-
-    dsmrValue value;
-    dsmrValueSetText(&value, (groupCount > 0) ? groups[0] : "");
-
-    if (!addField(ctx, obis, channel, &value, NULL, NULL))
-    {
-      rejectWith(ctx, DSMR_DIAG_SIZE_LIMIT, obis, linePosition);
-      return false;
-    }
-
-    return true;
+    return addUnknownField(ctx, obis, channel, (groupCount > 0) ? groups[0] : "", linePosition);
   }
 
   if (isDuplicate(ctx, obis, channel, (definition->flags & DSMR_FIELD_FLAG_REPEATABLE) != 0u))
@@ -467,10 +500,7 @@ static bool decodeLine(DecodeContext *ctx, char *line, size_t lineLength, size_t
 
         if (declared != NULL)
         {
-          dsmrMbusDeviceType publishedType;
-          bool known = deviceTypeFromPublishedValue(value.mantissa, &publishedType);
-
-          if (!known || (publishedType != declared->deviceType))
+          if (!publishedValueMatchesDeviceType(value.mantissa, declared->deviceType))
           {
             addPendingDiagnostic(ctx->output, DSMR_DIAG_MBUS_TYPE_MISMATCH, obis, linePosition);
           }
@@ -538,7 +568,7 @@ static bool decodeLine(DecodeContext *ctx, char *line, size_t lineLength, size_t
     }
   }
 
-  if (!addField(ctx, obis, channel, &value, definition->unit, hasTimestamp ? &timestamp : NULL))
+  if (!addField(ctx, obis, channel, &value, definition->unit, hasTimestamp ? &timestamp : NULL, DSMR_FIELD_CLASS_KNOWN))
   {
     rejectWith(ctx, DSMR_DIAG_SIZE_LIMIT, obis, linePosition);
     return false;

@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_value.c - locale-independent value and timestamp parsing
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //-- ==========================================================================
 
 #include "dsmr_value.h"

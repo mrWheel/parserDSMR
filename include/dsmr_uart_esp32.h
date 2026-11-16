@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: include/dsmr_uart_esp32.h - ESP-IDF UART adapter
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //--
 //-- This adapter is outside the Arduino compilation path; the portable core
 //-- under src/ does not depend on it. It configures the UART from the

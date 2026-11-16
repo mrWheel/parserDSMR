@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_decode.h - OBIS line decoding
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //--
 //-- The decoder walks the stored candidate line by line. It validates the
 //-- identification line, the blank line and the CR LF boundaries of every

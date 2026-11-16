@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: include/dsmr_parser.h - public C API of the portable core
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 3
 //--
 //-- Portable ISO C11 core. This header uses standard C headers only and has
 //-- no ESP-IDF dependency. The same sources compile for the ESP-IDF component
@@ -291,6 +291,18 @@ typedef struct
 //-- Telegram result and events
 //-- --------------------------------------------------------------------------
 
+//-- Classification of a received field. A field whose OBIS code is defined
+//-- by the active profile is KNOWN. A field that the profile does not
+//-- define is UNKNOWN: it is never a fault. The overview of European P1
+//-- OBIS usage explicitly requires a universal parser to ignore unknown
+//-- lines or keep them as raw data without rejecting the telegram, because
+//-- manufacturers add extra diagnostic objects in the 96.x.x range.
+typedef enum
+{
+  DSMR_FIELD_CLASS_KNOWN = 0,
+  DSMR_FIELD_CLASS_UNKNOWN,
+} dsmrFieldClass;
+
 typedef struct
 {
   const char *obis;
@@ -300,6 +312,7 @@ typedef struct
   const char *unit;
   dsmrTimestamp timestamp;
   bool hasTimestamp;
+  dsmrFieldClass classification;
 } dsmrTelegramField;
 
 typedef struct
@@ -442,6 +455,12 @@ int dsmrFormatValue(const dsmrValue *value, char *buffer, size_t bufferSize);
 //-- Stable strings for diagnostics and logging.
 const char *dsmrStatusToString(dsmrParserStatus status);
 const char *dsmrDiagReasonToString(dsmrDiagReason reason);
+const char *dsmrFieldClassToString(dsmrFieldClass classification);
+
+//-- Library version string, e.g. "v0.9.0". The returned pointer is stable for
+//-- the lifetime of the program and never NULL; the storage belongs to the
+//-- parser, the caller must not free or modify it.
+const char *dsmrParserVersion(void);
 
 #ifdef __cplusplus
 }

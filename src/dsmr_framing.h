@@ -1,7 +1,7 @@
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_framing.h - ASCII framing state machine
-//-- Date: 2026-11-14 · Build: 1
+//-- Date: 2026-11-16 · Build: 2
 //--
 //-- The framer walks the explicit states of projectPrompt.md section 4:
 //-- seeking a header, receiving the body and validating the trailer. A

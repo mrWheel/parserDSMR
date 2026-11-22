@@ -1,10 +1,13 @@
-# parserDSMR - live UART test program
-# Date: 2026-11-16 · Build: 2
+# parserDSMR - live UART test program (local development project)
+# Date: 2026-11-21 · Build: 3
+#
+# Development wrapper around components/parserDSMR/examples/live_uart.
+# The published example resolves parserDSMR from the registry through the
+# manifest in its main component; this project uses the local checkout.
 
 cmake_minimum_required(VERSION 3.16)
 
-get_filename_component(DSMR_COMPONENT_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
-list(APPEND EXTRA_COMPONENT_DIRS "${DSMR_COMPONENT_ROOT}")
+list(APPEND EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../../components")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(live_uart)

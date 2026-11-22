@@ -1,20 +1,9 @@
-## parserDSMR - manifest for the ESP Component Registry
-## Date: 2026-11-16 · Build: 4
+## parserDSMR - project manifest for the local development application
+## Date: 2026-11-21 · Build: 5
 ##
-## The repository field must point at the public repository before the
-## component is published.
-##
-## The single source of the version is PROG_VERSION in src/dsmr_parser.c.
-## The registry tooling needs a static version: field here, so keep this
-## value in sync with PROG_VERSION (without the leading 'v').
+## This is the ESP-IDF project manifest of the root test application. The
+## component manifest for the ESP Component Registry lives in
+## components/parserDSMR/idf_component.yml.
 
-version: "0.9.1"
-description: "Portable C11 DSMR/P1 smart-meter telegram parser with an ESP-IDF UART adapter, supporting Dutch DSMR 4.0/4.2/5.0, Belgian eMUCs and the documented European P1 OBIS profiles"
-url: "https://github.com/mrWheel/parserDSMR"
-repository: "https://github.com/mrWheel/parserDSMR"
-documentation: "https://github.com/mrWheel/parserDSMR/blob/main/README.md"
-license: "MIT"
-targets:
-  - esp32s3
 dependencies:
-  idf: ">=5.3"
+  idf: ">=6.0.2"

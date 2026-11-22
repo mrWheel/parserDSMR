@@ -1,8 +1,11 @@
 # ESP-IDF project ignores
-# Date: 2026-11-16 · Build: 2
+# Date: 2026-11-21 · Build: 3
 
 # --- ESP-IDF build output ---
 build/
+
+# --- compote component archives ---
+dist/
 cmake-build-*/
 .cmake/
 CMakeLists.txt.user*

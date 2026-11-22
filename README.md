@@ -1,6 +1,24 @@
+<!--
+    parserDSMR - reusable C library that parses European DSMR/P1 smart-meter telegrams
+    Copyright (C) 2026  Willem Aandewiel (mrWheel)
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
 # parserDSMR — DSMR/P1 smart-meter telegram parser
 
-**Date:** 2026-11-16 · **Build:** 10
+**Date:** 2026-11-22 · **Build:** 12
 
 parserDSMR is a reusable C library that reads and parses P1 telegrams from
 European (Dutch, Belgian, Hungarian, Swedish, Finnish, Lithuanian, Irish,
@@ -84,15 +102,18 @@ same `src/` sources and expose the same C API.
 
 ## Installing the component
 
-The component lives in `components/parserDSMR/`; its `src/`, `include/` and
-`adapter/` entries are relative links to the shared sources at the
-repository root. The component registers itself with
+The component lives in `components/parserDSMR/` and is self-contained: its
+`src/`, `include/`, `adapter/`, manifest, README and license all sit in the
+component directory. The component registers itself with
 `idf_component_register()` and pulls in `esp_driver_uart`,
 `esp_driver_gpio` and `esp_timer`.
 
-The component is **not yet published** to the ESP Component Registry (the
-manifest `idf_component.yml` is prepared for release). Until then there
-are two ways to use it in your own ESP-IDF project.
+The component is **not yet published** to the ESP Component Registry (see
+[PUBLISHING.md](PUBLISHING.md); the manifest
+`components/parserDSMR/idf_component.yml` is prepared for release). Once
+published, install it with `idf.py add-dependency
+"mrwheel/parserDSMR^0.9.2"`. Until then there are two ways to use it in
+your own ESP-IDF project.
 
 **Option A — reference the checkout with EXTRA_COMPONENT_DIRS.** Add the
 repository's `components/` directory to the search path in your project's
@@ -107,18 +128,9 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(myP1Reader)
 ```
 
-**Option B — vendor the component.** Copy these four items into
-`<your project>/components/parserDSMR/`, replacing the symlinked
-directories with real copies (needed when symlinks do not survive your
-distribution method):
-
-```
-components/parserDSMR/
-├── CMakeLists.txt      copy from components/parserDSMR/CMakeLists.txt
-├── src/                copy from the repository root src/
-├── include/            copy from the repository root include/
-└── adapter/            copy from the repository root adapter/
-```
+**Option B — vendor the component.** Copy the whole
+`components/parserDSMR/` directory into `<your project>/components/`. The
+directory is complete; nothing else is needed.
 
 In both cases the application component then simply requires it:
 
@@ -1010,6 +1022,13 @@ developer never runs flash commands.)
 
 ### The dedicated examples
 
+The example sources ship inside the component under
+`components/parserDSMR/examples/`; they are standalone ESP-IDF projects
+that resolve `mrwheel/parserDSMR` from the registry through the manifest in
+their `main/` component. The folders under `examples/` are thin development
+wrappers: they build the same `app_main.c` against the local checkout, so
+both paths exercise identical code before publication.
+
 To run either dedicated example instead, open its folder as a project:
 
 ```
@@ -1078,27 +1097,32 @@ signal is activated.
 ```
 parserDSMR/
 ├── CMakeLists.txt            ESP-IDF no-hardware test project
-├── components/parserDSMR/    ESP-IDF component used by the root test project
+├── components/parserDSMR/    the publishable ESP-IDF component
+│   ├── idf_component.yml     manifest for the ESP Component Registry
+│   ├── README.md             registry page of the component
+│   ├── LICENSE               GPL-3.0-or-later
+│   ├── CMakeLists.txt        component registration
+│   ├── include/              public headers
+│   │   ├── dsmr_parser.h     public C API of the portable core
+│   │   └── dsmr_uart_esp32.h ESP-IDF UART adapter
+│   ├── src/                  portable core (the future Arduino src/)
+│   │   ├── dsmr_crc.c/.h     CRC-16/ARC over '/' through '!'
+│   │   ├── dsmr_framing.c/.h seek-header / body / trailer state machine
+│   │   ├── dsmr_value.c/.h   locale-free decimal, integer and timestamp conversion
+│   │   ├── dsmr_profile.c/.h profile registry and field tables (NL, BE)
+│   │   ├── dsmr_decode.c/.h  OBIS line splitting and field decoding
+│   │   └── dsmr_parser.c     configuration, workspace, events, public API
+│   ├── adapter/
+│   │   └── dsmr_uart_esp32.c UART receive task, outside the Arduino path
+│   └── examples/
+│       ├── stored_telegram/  published example project (fixture replay, no wiring)
+│       └── live_uart/        published example project (UART, one line per OBIS)
 ├── main/                     no-hardware sample replay application
-├── idf_component.yml         manifest for the ESP Component Registry
-├── LICENSE                   MIT
+├── idf_component.yml         project manifest of the root test application
+├── LICENSE                   GPL-3.0-or-later
 ├── README.md                 this document
 ├── projectPrompt.md          product specification (authoritative)
-├── include/                  public headers
-│   ├── dsmr_parser.h         public C API of the portable core
-│   └── dsmr_uart_esp32.h     ESP-IDF UART adapter
-├── src/                      portable core (the future Arduino src/)
-│   ├── dsmr_crc.c/.h         CRC-16/ARC over '/' through '!'
-│   ├── dsmr_framing.c/.h     seek-header / body / trailer state machine
-│   ├── dsmr_value.c/.h       locale-free decimal, integer and timestamp conversion
-│   ├── dsmr_profile.c/.h     profile registry and field tables (NL, BE)
-│   ├── dsmr_decode.c/.h      OBIS line splitting and field decoding
-│   └── dsmr_parser.c         configuration, workspace, events, public API
-├── adapter/
-│   └── dsmr_uart_esp32.c     UART receive task, outside the Arduino path
-├── examples/
-│   ├── stored_telegram/      fixture replay from the USB console, no wiring
-│   └── live_uart/            UART reception and one line per OBIS display
+├── examples/                 local development wrappers for the component examples
 ├── test/
 │   ├── fixtures/             shared telegram set + CRC generator tool
 │   └── host/                 host tests, compiled as C11 without ESP-IDF

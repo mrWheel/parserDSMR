@@ -1,0 +1,8 @@
+## parserDSMR live_uart example - dependency on the published component
+## Date: 2026-11-22 · Build: 2
+##
+## Keep the version in sync with the component manifest (one directory
+## up through src/dsmr_parser.c is the single source of the version).
+
+dependencies:
+  mrwheel/parserDSMR: "^0.9.2"

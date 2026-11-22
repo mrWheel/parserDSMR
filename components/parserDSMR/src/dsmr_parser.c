@@ -1,7 +1,23 @@
+//--    parserDSMR - public parser API, framing glue and event dispatch
+//--    Copyright (C) 2026  Willem Aandewiel (mrWheel)
+//--
+//--    This program is free software: you can redistribute it and/or modify
+//--    it under the terms of the GNU General Public License as published by
+//--    the Free Software Foundation, either version 3 of the License, or
+//--    (at your option) any later version.
+//--
+//--    This program is distributed in the hope that it will be useful,
+//--    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//--    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//--    GNU General Public License for more details.
+//--
+//--    You should have received a copy of the GNU General Public License
+//--    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 //-- ==========================================================================
 //-- parserDSMR - DSMR/P1 telegram parser
 //-- File: src/dsmr_parser.c - public API, framing glue and event dispatch
-//-- Date: 2026-11-16 · Build: 7
+//-- Date: 2026-11-22 · Build: 9
 //--
 //-- The parser owns no memory of its own. The workspace is carved into the
 //-- telegram buffer, the field array, and the deep copies of the M-Bus
@@ -26,7 +42,7 @@
 //-- Library version. Kept in exactly one place; the version travels with the
 //-- source file headers (Date/Build) and with idf_component.yml. Callers read
 //-- it through dsmrParserVersion().
-static const char *PROG_VERSION = "v0.9.1";
+static const char *PROG_VERSION = "v0.9.2";
 
 //-- --------------------------------------------------------------------------
 //-- Small helpers

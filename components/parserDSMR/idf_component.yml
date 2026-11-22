@@ -1,0 +1,40 @@
+## parserDSMR - manifest for the ESP Component Registry
+## Date: 2026-11-22 · Build: 6
+##
+## The repository field must point at the public repository before the
+## component is published. repository_info.path tells the registry where
+## the component lives inside the repository.
+##
+## Pack and upload from this directory:
+##   compote component pack --name parserDSMR
+##   compote component upload --name parserDSMR --namespace mrwheel
+##
+## The single source of the version is PROG_VERSION in src/dsmr_parser.c.
+## The registry tooling needs a static version: field here, so keep this
+## value in sync with PROG_VERSION (without the leading 'v').
+
+version: "0.9.2"
+license: "GPL-3.0-or-later"
+
+description: "Portable C11 DSMR/P1 smart-meter telegram parser with an ESP-IDF UART adapter, supporting Dutch DSMR 4.0/4.2/5.0, Belgian eMUCs and the documented European P1 OBIS profiles"
+url: "https://github.com/mrWheel/parserDSMR"
+
+maintainers:
+  - "Willem Aandewiel (mrWheel)"
+
+repository: "https://github.com/mrWheel/parserDSMR"
+
+repository_info:
+  path: "components/parserDSMR"
+
+issues: "https://github.com/mrWheel/parserDSMR/issues"
+
+documentation: "https://github.com/mrWheel/parserDSMR/blob/main/components/parserDSMR/README.md"
+
+targets:
+  - esp32
+  - esp32s3
+  - esp32c3
+
+dependencies:
+  idf: ">=6.0.2"
